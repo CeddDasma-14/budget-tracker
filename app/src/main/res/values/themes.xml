@@ -1,0 +1,7 @@
+<resources>
+    <!-- Base theme — Compose renders its own UI, so this is a passthrough to hide the system status bar -->
+    <style name="Theme.BudgetTracker" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

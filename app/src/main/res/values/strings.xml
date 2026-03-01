@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">Budget Tracker</string>
+    <string name="initial_budget">Initial Budget</string>
+    <string name="remaining_balance">Remaining Balance</string>
+    <string name="expense_title_hint">Expense Title</string>
+    <string name="amount_hint">Amount</string>
+    <string name="paid">Paid</string>
+    <string name="add_expense">Add Expense</string>
+    <string name="save_budget">Save Budget</string>
+    <string name="add_receipt">Add Receipt</string>
+    <string name="history">History</string>
+    <string name="session_name_hint">Budget Name (e.g. March 2026)</string>
+    <string name="assign_receipt_title">Assign Receipt To</string>
+    <string name="select_expense">Select Expense</string>
+    <string name="no_history">No saved budgets yet</string>
+    <string name="over_budget">OVER BUDGET</string>
+    <string name="total_expenses">Total Expenses</string>
+</resources>
