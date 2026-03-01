@@ -1,6 +1,10 @@
 package com.cedd.budgettracker
 
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
 import android.os.Bundle
+import android.view.View
+import android.view.animation.AnticipateInterpolator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -10,6 +14,8 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
+import androidx.core.animation.doOnEnd
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cedd.budgettracker.data.preferences.PreferencesRepository
 import com.cedd.budgettracker.navigation.AppNavigation
@@ -23,8 +29,22 @@ class MainActivity : ComponentActivity() {
     lateinit var prefsRepository: PreferencesRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        splashScreen.setOnExitAnimationListener { provider ->
+            val scaleX = ObjectAnimator.ofFloat(provider.iconView, View.SCALE_X, 1f, 1.8f)
+            val scaleY = ObjectAnimator.ofFloat(provider.iconView, View.SCALE_Y, 1f, 1.8f)
+            val fade  = ObjectAnimator.ofFloat(provider.view, View.ALPHA, 1f, 0f)
+            AnimatorSet().apply {
+                interpolator = AnticipateInterpolator()
+                duration = 500L
+                playTogether(scaleX, scaleY, fade)
+                doOnEnd { provider.remove() }
+                start()
+            }
+        }
         setContent {
             val isDarkMode by prefsRepository.isDarkMode.collectAsStateWithLifecycle(initialValue = false)
             BudgetTrackerTheme(darkTheme = isDarkMode) {
