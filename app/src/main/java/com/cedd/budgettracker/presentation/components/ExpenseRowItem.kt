@@ -131,7 +131,7 @@ private fun ExpenseCard(
 ) {
     val cardColor by animateColorAsState(
         targetValue = when {
-            expense.isPaid && expense.isLocked -> Color(0xFFCCF2F1)
+            expense.isPaid && expense.isLocked -> Color(0xFFE3F2FD)
             expense.isLocked -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             else -> MaterialTheme.colorScheme.surface
         },
@@ -214,8 +214,8 @@ private fun LockedRow(
             checked = expense.isPaid,
             onCheckedChange = { onPaidToggle() },
             colors = CheckboxDefaults.colors(
-                checkedColor = Color(0xFF00B7B5),
-                uncheckedColor = Color(0xFF018790)
+                checkedColor = Color(0xFF00BFA5),
+                uncheckedColor = Color(0xFF90A4AE)
             ),
             modifier = Modifier.size(36.dp)
         )
@@ -292,7 +292,7 @@ private fun LockedRow(
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = if (expense.isPaid)
-                Color(0xFF00B7B5).copy(alpha = 0.12f)
+                Color(0xFF00BFA5).copy(alpha = 0.12f)
             else
                 MaterialTheme.colorScheme.primaryContainer
         ) {
@@ -302,7 +302,7 @@ private fun LockedRow(
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold,
                 color = if (expense.isPaid)
-                    Color(0xFF00B7B5).copy(alpha = 0.5f)
+                    Color(0xFF00BFA5).copy(alpha = 0.5f)
                 else
                     MaterialTheme.colorScheme.onPrimaryContainer,
                 textDecoration = if (expense.isPaid) TextDecoration.LineThrough else null
@@ -474,7 +474,7 @@ private fun EditableRow(
                 Checkbox(
                     checked = expense.isPaid,
                     onCheckedChange = { onPaidToggle() },
-                    colors = CheckboxDefaults.colors(checkedColor = Color(0xFF00B7B5), uncheckedColor = Color(0xFF018790))
+                    colors = CheckboxDefaults.colors(checkedColor = Color(0xFF00BFA5), uncheckedColor = Color(0xFF90A4AE))
                 )
             }
 

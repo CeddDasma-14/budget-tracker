@@ -33,7 +33,7 @@ private fun BudgetWidgetContent() {
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ColorProvider(Color(0xFF005461)))
+            .background(ColorProvider(Color(0xFF0A2342)))
             .padding(16.dp),
         contentAlignment = Alignment.Center
     ) {

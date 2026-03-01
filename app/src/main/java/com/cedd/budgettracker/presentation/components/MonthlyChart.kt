@@ -29,7 +29,7 @@ fun MonthlySpendingChart(
     val recent = sessions.take(6).reversed()   // Show last 6 sessions oldest → newest
     val maxSpent = recent.maxOf { it.expenses.sumOf { e -> e.amount } }.coerceAtLeast(1.0)
 
-    val barColor  = Color(0xFF018790)
+    val barColor  = Color(0xFF1565C0)
     val overColor = Color(0xFFD32F2F)
     val onSurface = MaterialTheme.colorScheme.onSurface
 

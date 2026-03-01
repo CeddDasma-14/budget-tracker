@@ -226,7 +226,7 @@ private fun SessionHistoryCard(
                         BudgetMetric(
                             label = if (isOverBudget) "OVER" else "Left",
                             value = CurrencyUtils.formatPhp(remaining),
-                            valueColor = if (isOverBudget) MaterialTheme.colorScheme.error else Color(0xFF00B7B5),
+                            valueColor = if (isOverBudget) MaterialTheme.colorScheme.error else Color(0xFF00BFA5),
                             labelColor = if (isOverBudget) MaterialTheme.colorScheme.error else null
                         )
                     }
@@ -239,7 +239,7 @@ private fun SessionHistoryCard(
                         val paidCount = expenses.count { it.isPaid }
                         if (paidCount > 0) {
                             AssistChip(onClick = {}, label = { Text("$paidCount paid") }, leadingIcon = {
-                                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF00B7B5))
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF00BFA5))
                             })
                         }
                         val receiptCount = expenses.count { it.receiptPath != null }
@@ -283,7 +283,7 @@ private fun ExpenseHistoryRow(expense: ExpenseEntity) {
         Icon(
             imageVector = if (expense.isPaid) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
             contentDescription = null,
-            tint = if (expense.isPaid) Color(0xFF2E7D32) else MaterialTheme.colorScheme.outline,
+            tint = if (expense.isPaid) Color(0xFF00BFA5) else MaterialTheme.colorScheme.outline,
             modifier = Modifier.size(18.dp)
         )
         Column(modifier = Modifier.weight(1f)) {
