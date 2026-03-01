@@ -30,7 +30,7 @@ fun BudgetProgressBar(
             progress >= 1f   -> Color(0xFFD32F2F)  // Red — over budget
             progress >= 0.8f -> Color(0xFFFF6F00)  // Amber — warning
             progress >= 0.5f -> Color(0xFFF9A825)  // Yellow — caution
-            else             -> Color(0xFF2E7D32)  // Green — healthy
+            else             -> Color(0xFF00B7B5)  // Turquoise — healthy
         },
         animationSpec = tween(400),
         label = "bar_color"

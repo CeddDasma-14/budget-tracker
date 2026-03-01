@@ -266,7 +266,7 @@ private fun BudgetHeaderCard(
         targetValue = when {
             isOverBudget -> MaterialTheme.colorScheme.error
             state.remainingBalance < budget * 0.1 -> Color(0xFFFF6F00)
-            else -> Color(0xFF2E7D32)
+            else -> Color(0xFF00B7B5)
         },
         animationSpec = tween(300),
         label = "balance_color"
