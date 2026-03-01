@@ -34,6 +34,9 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.cedd.budgettracker.domain.model.ExpenseCategory
@@ -55,7 +58,6 @@ fun ExpenseRowItem(
     onRemoveReceipt: () -> Unit,
     onCategoryChange: (ExpenseCategory) -> Unit,
     onToggleRecurring: () -> Unit,
-    onTriggerOcr: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val rowPhotoPicker = rememberLauncherForActivityResult(
@@ -108,8 +110,7 @@ fun ExpenseRowItem(
             },
             onRemoveReceipt = onRemoveReceipt,
             onCategoryChange = onCategoryChange,
-            onToggleRecurring = onToggleRecurring,
-            onTriggerOcr = onTriggerOcr
+            onToggleRecurring = onToggleRecurring
         )
     }
 }
@@ -126,8 +127,7 @@ private fun ExpenseCard(
     onAttachReceipt: () -> Unit,
     onRemoveReceipt: () -> Unit,
     onCategoryChange: (ExpenseCategory) -> Unit,
-    onToggleRecurring: () -> Unit,
-    onTriggerOcr: () -> Unit
+    onToggleRecurring: () -> Unit
 ) {
     val cardColor by animateColorAsState(
         targetValue = when {
@@ -187,8 +187,33 @@ private fun ExpenseCard(
                 onAttachReceipt = onAttachReceipt,
                 onRemoveReceipt = onRemoveReceipt,
                 onCategoryChange = onCategoryChange,
-                onToggleRecurring = onToggleRecurring,
-                onTriggerOcr = onTriggerOcr
+                onToggleRecurring = onToggleRecurring
+            )
+        }
+    }
+}
+
+// ── Full-screen image preview dialog ──────────────────────────────────────────
+
+@Composable
+private fun FullScreenImageDialog(path: String, onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(File(path)).crossfade(true).build(),
+                contentDescription = "Receipt full screen",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
             )
         }
     }
@@ -203,6 +228,12 @@ private fun LockedRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    var showFullScreen by remember { mutableStateOf(false) }
+
+    if (showFullScreen && expense.receiptPath != null) {
+        FullScreenImageDialog(path = expense.receiptPath, onDismiss = { showFullScreen = false })
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -275,16 +306,17 @@ private fun LockedRow(
             }
         }
 
-        // Inline receipt thumbnail
+        // Inline receipt thumbnail — tap to preview full screen
         expense.receiptPath?.let { path ->
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(File(path)).crossfade(true).build(),
-                contentDescription = null,
+                contentDescription = "Receipt",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(6.dp))
+                    .clickable { showFullScreen = true }
             )
         }
 
@@ -346,9 +378,14 @@ private fun EditableRow(
     onAttachReceipt: () -> Unit,
     onRemoveReceipt: () -> Unit,
     onCategoryChange: (ExpenseCategory) -> Unit,
-    onToggleRecurring: () -> Unit,
-    onTriggerOcr: () -> Unit
+    onToggleRecurring: () -> Unit
 ) {
+    var showFullScreen by remember { mutableStateOf(false) }
+
+    if (showFullScreen && expense.receiptPath != null) {
+        FullScreenImageDialog(path = expense.receiptPath, onDismiss = { showFullScreen = false })
+    }
+
     Column(modifier = Modifier.padding(12.dp)) {
 
         // Header: label + done + delete
@@ -519,18 +556,6 @@ private fun EditableRow(
                     Icon(Icons.Default.Repeat, contentDescription = null, modifier = Modifier.size(14.dp))
                 }
             )
-
-            // OCR scan button — only if receipt is attached
-            if (expense.receiptPath != null) {
-                FilterChip(
-                    selected = false,
-                    onClick = onTriggerOcr,
-                    label = { Text("Scan Amount", style = MaterialTheme.typography.labelSmall) },
-                    leadingIcon = {
-                        Icon(Icons.Default.DocumentScanner, contentDescription = null, modifier = Modifier.size(14.dp))
-                    }
-                )
-            }
         }
 
         if (expense.receiptPath != null) {
@@ -541,7 +566,8 @@ private fun EditableRow(
             ) {
                 ReceiptThumbnail(
                     receiptPath = expense.receiptPath,
-                    onRemove = onRemoveReceipt
+                    onRemove = onRemoveReceipt,
+                    onClick = { showFullScreen = true }
                 )
                 Text(
                     "Receipt attached",

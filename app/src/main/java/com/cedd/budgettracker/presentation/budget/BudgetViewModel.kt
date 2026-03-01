@@ -40,6 +40,10 @@ class BudgetViewModel @Inject constructor(
         _uiState.update { it.copy(sessionName = name) }
     }
 
+    fun updateSelectedDate(dateMillis: Long) {
+        _uiState.update { it.copy(selectedDate = dateMillis) }
+    }
+
     // ── Initial budget ────────────────────────────────────────────────────────
 
     fun updateInitialBudget(raw: String) {
@@ -254,7 +258,8 @@ class BudgetViewModel @Inject constructor(
                     id = state.sessionId,
                     name = state.sessionName.ifBlank { defaultName },
                     initialBudget = state.initialBudget.replace(",", "").toDoubleOrNull() ?: 0.0,
-                    updatedAt = System.currentTimeMillis()
+                    updatedAt = System.currentTimeMillis(),
+                    budgetDate = state.selectedDate
                 )
 
                 val newSessionId = repository.saveSession(sessionEntity)

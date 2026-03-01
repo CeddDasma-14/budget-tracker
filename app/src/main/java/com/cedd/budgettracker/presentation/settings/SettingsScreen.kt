@@ -101,8 +101,9 @@ fun SettingsScreen(
                         modifier = Modifier.size(24.dp)
                     )
                     Column {
-                        Text("Budget Tracker", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text("CeddFlow", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         Text("Version 1.0 · PHP Currency", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Developed by Ced Dasma", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

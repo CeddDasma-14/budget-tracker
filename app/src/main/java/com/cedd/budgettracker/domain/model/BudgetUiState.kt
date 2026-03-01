@@ -30,5 +30,9 @@ data class BudgetUiState(
     val showSaveTemplateDialog: Boolean = false,
 
     // ── OCR ───────────────────────────────────────────────────────────────────
-    val isOcrRunning: Boolean = false
+    val isOcrRunning: Boolean = false,
+
+    // ── Date ──────────────────────────────────────────────────────────────────
+    /** User-selected budget date in millis. Defaults to today. */
+    val selectedDate: Long = System.currentTimeMillis()
 )

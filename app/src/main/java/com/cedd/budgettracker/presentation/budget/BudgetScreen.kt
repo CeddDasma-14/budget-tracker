@@ -1,6 +1,5 @@
 package com.cedd.budgettracker.presentation.budget
 
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,7 +33,9 @@ import com.cedd.budgettracker.domain.model.BudgetUiState
 import com.cedd.budgettracker.presentation.components.BudgetProgressBar
 import com.cedd.budgettracker.presentation.components.ExpenseRowItem
 import com.cedd.budgettracker.presentation.utils.CurrencyUtils
-import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,7 +65,7 @@ fun BudgetScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Budget Tracker", fontWeight = FontWeight.Bold) },
+                title = { Text("CeddFlow", fontWeight = FontWeight.Bold) },
                 actions = {
                     IconButton(onClick = viewModel::showTemplateDialog) {
                         Icon(Icons.Default.FolderOpen, contentDescription = "Load Template")
@@ -116,20 +117,9 @@ fun BudgetScreen(
                 BudgetHeaderCard(
                     state = state,
                     onSessionNameChange = viewModel::updateSessionName,
-                    onInitialBudgetChange = viewModel::updateInitialBudget
+                    onInitialBudgetChange = viewModel::updateInitialBudget,
+                    onDateChange = viewModel::updateSelectedDate
                 )
-            }
-
-            // OCR running indicator
-            if (state.isOcrRunning) {
-                item {
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        color = MaterialTheme.colorScheme.tertiary
-                    )
-                }
             }
 
             item {
@@ -170,11 +160,6 @@ fun BudgetScreen(
                     onRemoveReceipt = { viewModel.removeReceiptFromExpense(index) },
                     onCategoryChange = { cat -> viewModel.updateExpenseCategory(index, cat) },
                     onToggleRecurring = { viewModel.toggleRecurring(index) },
-                    onTriggerOcr = {
-                        expense.receiptPath?.let { path ->
-                            viewModel.triggerOcr(index, Uri.fromFile(File(path)))
-                        }
-                    },
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
                         .animateItem(
@@ -252,15 +237,40 @@ fun BudgetScreen(
 
 // ── Budget header card ─────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BudgetHeaderCard(
     state: BudgetUiState,
     onSessionNameChange: (String) -> Unit,
-    onInitialBudgetChange: (String) -> Unit
+    onInitialBudgetChange: (String) -> Unit,
+    onDateChange: (Long) -> Unit
 ) {
     val isOverBudget = state.remainingBalance < 0
     val budget = state.initialBudget.replace(",", "").toDoubleOrNull() ?: 0.0
     val totalExpenses = state.expenses.sumOf { it.amountAsDouble }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = state.selectedDate)
+    val formattedDate = remember(state.selectedDate) {
+        SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault()).format(Date(state.selectedDate))
+    }
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { onDateChange(it) }
+                    showDatePicker = false
+                }) { Text("OK", color = Color.White) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel", color = Color.White.copy(alpha = 0.7f))
+                }
+            }
+        ) { DatePicker(state = datePickerState) }
+    }
 
     val balanceColor by animateColorAsState(
         targetValue = when {
@@ -298,10 +308,43 @@ private fun BudgetHeaderCard(
                 ),
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedLabelColor = Color.White.copy(alpha = 0.8f),
+                    unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
+                    focusedPlaceholderColor = Color.White.copy(alpha = 0.4f),
+                    unfocusedPlaceholderColor = Color.White.copy(alpha = 0.4f),
+                    focusedLeadingIconColor = Color.White,
+                    unfocusedLeadingIconColor = Color.White.copy(alpha = 0.6f),
+                    focusedBorderColor = MaterialTheme.colorScheme.secondary,
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
+                    cursorColor = Color.White,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
                 )
             )
+
+            // Date picker row
+            OutlinedCard(
+                onClick = { showDatePicker = true },
+                modifier = Modifier.fillMaxWidth(),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                colors = CardDefaults.outlinedCardColors(containerColor = Color.Transparent)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(Icons.Default.Event, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
+                    Column {
+                        Text("Budget Date", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                        Text(formattedDate, style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.Medium)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.White.copy(alpha = 0.5f))
+                }
+            }
 
             OutlinedTextField(
                 value = state.initialBudget,
@@ -317,7 +360,21 @@ private fun BudgetHeaderCard(
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = LocalTextStyle.current.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedLabelColor = Color.White.copy(alpha = 0.8f),
+                    unfocusedLabelColor = Color.White.copy(alpha = 0.6f),
+                    focusedPlaceholderColor = Color.White.copy(alpha = 0.4f),
+                    unfocusedPlaceholderColor = Color.White.copy(alpha = 0.4f),
+                    focusedLeadingIconColor = Color.White,
+                    unfocusedLeadingIconColor = Color.White.copy(alpha = 0.6f),
+                    focusedBorderColor = MaterialTheme.colorScheme.secondary,
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
+                    cursorColor = Color.White,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedPrefixColor = Color.White,
+                    unfocusedPrefixColor = Color.White,
                 )
             )
 

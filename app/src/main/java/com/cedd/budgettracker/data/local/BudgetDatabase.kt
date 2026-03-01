@@ -19,7 +19,7 @@ import com.cedd.budgettracker.data.local.entity.TemplateExpenseEntity
         TemplateEntity::class,
         TemplateExpenseEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class BudgetDatabase : RoomDatabase() {
@@ -28,6 +28,13 @@ abstract class BudgetDatabase : RoomDatabase() {
     abstract fun templateDao(): TemplateDao
 
     companion object {
+        /** v2 → v3: add budgetDate to budget_sessions. Existing rows default to 0 (fallback to createdAt). */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE budget_sessions ADD COLUMN budgetDate INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         /** v1 → v2: add category + isRecurring to expenses; add template tables. */
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {

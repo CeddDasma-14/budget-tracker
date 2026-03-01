@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Budget Tracker</string>
+    <string name="app_name">CeddFlow</string>
     <string name="initial_budget">Initial Budget</string>
     <string name="remaining_balance">Remaining Balance</string>
     <string name="expense_title_hint">Expense Title</string>

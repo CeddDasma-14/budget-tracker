@@ -39,7 +39,7 @@ private fun BudgetWidgetContent() {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "Budget Tracker",
+                text = "CeddFlow",
                 style = TextStyle(
                     color = ColorProvider(Color.White),
                     fontSize = 12.sp,

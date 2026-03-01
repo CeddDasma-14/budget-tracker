@@ -31,6 +31,8 @@ import com.cedd.budgettracker.data.local.relation.BudgetSessionWithExpenses
 import com.cedd.budgettracker.presentation.components.MonthlySpendingChart
 import com.cedd.budgettracker.presentation.components.SpendingInsightsCard
 import com.cedd.budgettracker.presentation.utils.CurrencyUtils
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -88,7 +90,7 @@ fun HistoryScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
 
-                    // Monthly spending chart
+                    // Monthly spending chart (always uses all sessions for trend)
                     item {
                         Card(
                             modifier = Modifier
@@ -98,18 +100,68 @@ fun HistoryScreen(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             MonthlySpendingChart(
-                                sessions = state.sessions,
+                                sessions = state.allSessions,
                                 modifier = Modifier.padding(16.dp)
                             )
                         }
                     }
 
-                    // Spending insights
+                    // Spending insights (always uses all sessions)
                     item {
                         SpendingInsightsCard(
-                            sessions = state.sessions,
+                            sessions = state.allSessions,
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
+                    }
+
+                    // ── Month filter chips ───────────────────────────────────
+                    if (state.availableMonths.size > 1) {
+                        item {
+                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        "Filter by Month",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (state.selectedYearMonth != null) {
+                                        TextButton(onClick = viewModel::clearMonthFilter) {
+                                            Text("Show All", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    state.availableMonths.forEach { ym ->
+                                        val label = SimpleDateFormat("MMM yyyy", Locale.getDefault())
+                                            .format(java.util.GregorianCalendar(ym.year, ym.month - 1, 1).time)
+                                        FilterChip(
+                                            selected = state.selectedYearMonth == ym,
+                                            onClick = { viewModel.selectMonth(ym) },
+                                            label = { Text(label, style = MaterialTheme.typography.labelMedium) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Monthly combined summary card ────────────────────────
+                    state.monthlySummary?.let { summary ->
+                        item {
+                            MonthlySummaryCard(
+                                summary = summary,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
                     }
 
                     // Session history cards
@@ -319,6 +371,41 @@ private fun ExpenseHistoryRow(expense: ExpenseEntity) {
         }
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+}
+
+@Composable
+private fun MonthlySummaryCard(
+    summary: MonthSummary,
+    modifier: Modifier = Modifier
+) {
+    val isOver = summary.totalRemaining < 0
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Default.BarChart, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(18.dp))
+                Text(
+                    "${summary.entryCount} income flow${if (summary.entryCount > 1) "s" else ""} this month",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                BudgetMetric("Total Budget",  CurrencyUtils.formatPhp(summary.totalBudget))
+                BudgetMetric("Total Spent",   CurrencyUtils.formatPhp(summary.totalSpent))
+                BudgetMetric(
+                    label      = if (isOver) "OVER" else "Remaining",
+                    value      = CurrencyUtils.formatPhp(summary.totalRemaining),
+                    valueColor = if (isOver) MaterialTheme.colorScheme.error else Color(0xFF00BFA5)
+                )
+            }
+        }
+    }
 }
 
 @Composable
