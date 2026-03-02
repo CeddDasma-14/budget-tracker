@@ -11,7 +11,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +30,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.cedd.budgettracker.data.local.entity.ExpenseEntity
 import com.cedd.budgettracker.data.local.relation.BudgetSessionWithExpenses
+import com.cedd.budgettracker.domain.model.ExpenseCategory
 import com.cedd.budgettracker.presentation.components.MonthlySpendingChart
 import com.cedd.budgettracker.presentation.components.SpendingInsightsCard
 import com.cedd.budgettracker.presentation.utils.CurrencyUtils
@@ -45,6 +48,14 @@ fun HistoryScreen(
     viewModel: HistoryViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(state.templateSavedMessage) {
+        state.templateSavedMessage?.let {
+            snackbarHostState.showSnackbar("$it — load it from Budget screen \uD83D\uDCCB")
+            viewModel.clearTemplateSavedMessage()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -60,7 +71,8 @@ fun HistoryScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
 
         when {
@@ -73,7 +85,7 @@ fun HistoryScreen(
                 ) { CircularProgressIndicator() }
             }
 
-            state.sessions.isEmpty() -> {
+            state.allSessions.isEmpty() -> {
                 EmptyHistoryPlaceholder(
                     modifier = Modifier
                         .fillMaxSize()
@@ -90,90 +102,131 @@ fun HistoryScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
 
-                    // Monthly spending chart (always uses all sessions for trend)
+                    // Search bar
                     item {
-                        Card(
+                        OutlinedTextField(
+                            value = state.searchQuery,
+                            onValueChange = viewModel::updateSearch,
+                            placeholder = { Text("Search budgets by name…") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            trailingIcon = {
+                                if (state.searchQuery.isNotBlank()) {
+                                    IconButton(onClick = { viewModel.updateSearch("") }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            MonthlySpendingChart(
-                                sessions = state.allSessions,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        }
-                    }
-
-                    // Spending insights (always uses all sessions)
-                    item {
-                        SpendingInsightsCard(
-                            sessions = state.allSessions,
-                            modifier = Modifier.padding(horizontal = 16.dp)
+                                .padding(horizontal = 16.dp)
                         )
                     }
 
-                    // ── Month filter chips ───────────────────────────────────
-                    if (state.availableMonths.size > 1) {
+                    // Show "no results" when search yields nothing
+                    if (state.searchQuery.isNotBlank() && state.sessions.isEmpty()) {
                         item {
-                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        "Filter by Month",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    if (state.selectedYearMonth != null) {
-                                        TextButton(onClick = viewModel::clearMonthFilter) {
-                                            Text("Show All", style = MaterialTheme.typography.labelSmall)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.SearchOff, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outlineVariant)
+                                    Text("No budgets match \"${state.searchQuery}\"", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    } else {
+
+                        // Monthly spending chart (always uses all sessions for trend)
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                MonthlySpendingChart(
+                                    sessions = state.allSessions,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+                        }
+
+                        // Spending insights (always uses all sessions)
+                        item {
+                            SpendingInsightsCard(
+                                sessions = state.allSessions,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+
+                        // ── Month filter chips ───────────────────────────────────
+                        if (state.availableMonths.size > 1) {
+                            item {
+                                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            "Filter by Month",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        if (state.selectedYearMonth != null) {
+                                            TextButton(onClick = viewModel::clearMonthFilter) {
+                                                Text("Show All", style = MaterialTheme.typography.labelSmall)
+                                            }
                                         }
                                     }
-                                }
-                                Spacer(Modifier.height(6.dp))
-                                Row(
-                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    state.availableMonths.forEach { ym ->
-                                        val label = SimpleDateFormat("MMM yyyy", Locale.getDefault())
-                                            .format(java.util.GregorianCalendar(ym.year, ym.month - 1, 1).time)
-                                        FilterChip(
-                                            selected = state.selectedYearMonth == ym,
-                                            onClick = { viewModel.selectMonth(ym) },
-                                            label = { Text(label, style = MaterialTheme.typography.labelMedium) }
-                                        )
+                                    Spacer(Modifier.height(6.dp))
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        state.availableMonths.forEach { ym ->
+                                            val label = SimpleDateFormat("MMM yyyy", Locale.getDefault())
+                                                .format(java.util.GregorianCalendar(ym.year, ym.month - 1, 1).time)
+                                            FilterChip(
+                                                selected = state.selectedYearMonth == ym,
+                                                onClick = { viewModel.selectMonth(ym) },
+                                                label = { Text(label, style = MaterialTheme.typography.labelMedium) }
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    // ── Monthly combined summary card ────────────────────────
-                    state.monthlySummary?.let { summary ->
-                        item {
-                            MonthlySummaryCard(
-                                summary = summary,
+                        // ── Monthly combined summary card ────────────────────────
+                        state.monthlySummary?.let { summary ->
+                            item {
+                                MonthlySummaryCard(
+                                    summary = summary,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+                        }
+
+                        // Session history cards
+                        items(items = state.sessions, key = { it.session.id }) { sessionWithExpenses ->
+                            SessionHistoryCard(
+                                sessionWithExpenses = sessionWithExpenses,
+                                isExpanded = sessionWithExpenses.session.id in state.expandedSessionIds,
+                                onToggleExpand = { viewModel.toggleExpand(sessionWithExpenses.session.id) },
+                                onDeleteRequest = { viewModel.requestDeleteSession(sessionWithExpenses.session.id) },
+                                onExportCsv = { viewModel.exportCsv(sessionWithExpenses.session.id) },
+                                onCopyAsTemplate = { viewModel.saveSessionAsTemplate(sessionWithExpenses.session.id) },
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             )
                         }
-                    }
-
-                    // Session history cards
-                    items(items = state.sessions, key = { it.session.id }) { sessionWithExpenses ->
-                        SessionHistoryCard(
-                            sessionWithExpenses = sessionWithExpenses,
-                            isExpanded = sessionWithExpenses.session.id in state.expandedSessionIds,
-                            onToggleExpand = { viewModel.toggleExpand(sessionWithExpenses.session.id) },
-                            onDeleteRequest = { viewModel.requestDeleteSession(sessionWithExpenses.session.id) },
-                            onExportCsv = { viewModel.exportCsv(sessionWithExpenses.session.id) },
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
                     }
                 }
             }
@@ -209,6 +262,7 @@ private fun SessionHistoryCard(
     onToggleExpand: () -> Unit,
     onDeleteRequest: () -> Unit,
     onExportCsv: () -> Unit,
+    onCopyAsTemplate: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val session = sessionWithExpenses.session
@@ -249,6 +303,14 @@ private fun SessionHistoryCard(
                             )
                         }
                         Row {
+                            // Copy as template
+                            IconButton(onClick = onCopyAsTemplate) {
+                                Icon(
+                                    Icons.Default.ContentCopy,
+                                    contentDescription = "Copy as Template",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                )
+                            }
                             // CSV Export
                             IconButton(onClick = onExportCsv) {
                                 Icon(
@@ -318,6 +380,46 @@ private fun SessionHistoryCard(
                         )
                     } else {
                         expenses.forEach { expense -> ExpenseHistoryRow(expense = expense) }
+
+                        // Category breakdown
+                        Spacer(Modifier.height(4.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "By Category",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        val byCat = expenses
+                            .groupBy { ExpenseCategory.fromName(it.category) }
+                            .map { (cat, items) -> cat to items.sumOf { it.amount } }
+                            .sortedByDescending { it.second }
+                        byCat.forEach { (cat, total) ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(cat.emoji, fontSize = 12.sp)
+                                    Text(
+                                        cat.label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Text(
+                                    CurrencyUtils.formatPhp(total),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -347,12 +449,21 @@ private fun ExpenseHistoryRow(expense: ExpenseEntity) {
                 color = if (expense.isPaid) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 else MaterialTheme.colorScheme.onSurface
             )
-            Text(
-                text = expense.category,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                fontSize = 10.sp
-            )
+            if (expense.notes.isNotBlank()) {
+                Text(
+                    text = expense.notes,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    fontSize = 10.sp
+                )
+            } else {
+                Text(
+                    text = expense.category,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    fontSize = 10.sp
+                )
+            }
         }
         Text(
             text = CurrencyUtils.formatPhp(expense.amount),

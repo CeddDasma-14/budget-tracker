@@ -21,7 +21,7 @@ object AppModule {
     @Provides
     fun provideBudgetDatabase(@ApplicationContext context: Context): BudgetDatabase =
         Room.databaseBuilder(context, BudgetDatabase::class.java, "budget_tracker.db")
-            .addMigrations(BudgetDatabase.MIGRATION_1_2, BudgetDatabase.MIGRATION_2_3)
+            .addMigrations(BudgetDatabase.MIGRATION_1_2, BudgetDatabase.MIGRATION_2_3, BudgetDatabase.MIGRATION_3_4)
             .build()
 
     @Singleton @Provides

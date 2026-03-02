@@ -2,6 +2,7 @@ package com.cedd.budgettracker.presentation.history
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cedd.budgettracker.data.local.entity.ExpenseEntity
 import com.cedd.budgettracker.data.local.relation.BudgetSessionWithExpenses
 import com.cedd.budgettracker.data.repository.BudgetRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,7 +35,11 @@ data class HistoryUiState(
     val expandedSessionIds: Set<Long> = emptySet(),
     val deleteConfirmSessionId: Long? = null,
     /** Currently selected month filter. Null = show all. */
-    val selectedYearMonth: YearMonth? = null
+    val selectedYearMonth: YearMonth? = null,
+    /** Search query for filtering sessions by name. */
+    val searchQuery: String = "",
+    /** Non-null while snackbar "copied as template" is shown. */
+    val templateSavedMessage: String? = null
 ) {
     /** Effective date for a session: budgetDate if set (>0), otherwise createdAt. */
     private fun effectiveDate(s: BudgetSessionWithExpenses): Long =
@@ -51,10 +56,17 @@ data class HistoryUiState(
             .distinct()
             .sortedDescending()
 
-    /** Sessions visible after applying the month filter. */
+    /** Sessions visible after applying month filter and search query. */
     val sessions: List<BudgetSessionWithExpenses>
-        get() = if (selectedYearMonth == null) allSessions
-        else allSessions.filter { sessionYearMonth(it) == selectedYearMonth }
+        get() = allSessions
+            .let { list ->
+                if (selectedYearMonth == null) list
+                else list.filter { sessionYearMonth(it) == selectedYearMonth }
+            }
+            .let { list ->
+                if (searchQuery.isBlank()) list
+                else list.filter { it.session.name.contains(searchQuery, ignoreCase = true) }
+            }
 
     /** Combined totals for the selected month. Null when no filter active or no sessions match. */
     val monthlySummary: MonthSummary?
@@ -111,6 +123,8 @@ class HistoryViewModel @Inject constructor(
 
     fun clearMonthFilter() { _uiState.update { it.copy(selectedYearMonth = null) } }
 
+    fun updateSearch(query: String) { _uiState.update { it.copy(searchQuery = query) } }
+
     fun requestDeleteSession(sessionId: Long) {
         _uiState.update { it.copy(deleteConfirmSessionId = sessionId) }
     }
@@ -136,4 +150,24 @@ class HistoryViewModel @Inject constructor(
             if (uri != null) repository.shareCsvUri(uri)
         }
     }
+
+    /** Saves the session's expenses as a reusable template, then shows a confirmation snackbar. */
+    fun saveSessionAsTemplate(sessionId: Long) {
+        viewModelScope.launch {
+            val target = _uiState.value.allSessions.firstOrNull { it.session.id == sessionId } ?: return@launch
+            val templateExpenses = target.expenses.map { e ->
+                ExpenseEntity(
+                    sessionId = 0L,
+                    title = e.title,
+                    amount = e.amount,
+                    category = e.category,
+                    isRecurring = e.isRecurring
+                )
+            }
+            repository.saveTemplate(target.session.name, target.session.initialBudget, templateExpenses)
+            _uiState.update { it.copy(templateSavedMessage = "\"${target.session.name}\" saved as template!") }
+        }
+    }
+
+    fun clearTemplateSavedMessage() { _uiState.update { it.copy(templateSavedMessage = null) } }
 }

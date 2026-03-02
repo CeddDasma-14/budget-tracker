@@ -9,6 +9,7 @@ import com.cedd.budgettracker.data.local.relation.TemplateWithExpenses
 import com.cedd.budgettracker.data.repository.BudgetRepository
 import com.cedd.budgettracker.domain.model.BudgetUiState
 import com.cedd.budgettracker.domain.model.ExpenseCategory
+import com.cedd.budgettracker.domain.model.ExpenseSortOrder
 import com.cedd.budgettracker.domain.model.ExpenseUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +43,10 @@ class BudgetViewModel @Inject constructor(
 
     fun updateSelectedDate(dateMillis: Long) {
         _uiState.update { it.copy(selectedDate = dateMillis) }
+    }
+
+    fun updateGoalAmount(raw: String) {
+        _uiState.update { it.copy(goalAmount = raw) }
     }
 
     // ── Initial budget ────────────────────────────────────────────────────────
@@ -79,12 +84,30 @@ class BudgetViewModel @Inject constructor(
     fun removeExpenseRow(index: Int) {
         _uiState.update { state ->
             if (state.expenses.size <= 1) return@update state
+            val deleted = state.expenses[index]
             val updated = state.expenses.toMutableList().also { it.removeAt(index) }
             state.copy(
                 expenses = updated,
-                remainingBalance = budgetValue(state) - updated.sumOf { it.amountAsDouble }
+                remainingBalance = budgetValue(state) - updated.sumOf { it.amountAsDouble },
+                recentlyDeletedExpense = deleted
             )
         }
+    }
+
+    fun undoDelete() {
+        _uiState.update { state ->
+            val deleted = state.recentlyDeletedExpense ?: return@update state
+            val updated = state.expenses + deleted.copy(isLocked = true)
+            state.copy(
+                expenses = updated,
+                remainingBalance = budgetValue(state) - updated.sumOf { it.amountAsDouble },
+                recentlyDeletedExpense = null
+            )
+        }
+    }
+
+    fun clearRecentlyDeleted() {
+        _uiState.update { it.copy(recentlyDeletedExpense = null) }
     }
 
     fun updateExpenseTitle(index: Int, title: String) {
@@ -103,6 +126,14 @@ class BudgetViewModel @Inject constructor(
                 expenses = updated,
                 remainingBalance = budgetValue(state) - updated.sumOf { it.amountAsDouble }
             )
+        }
+    }
+
+    fun updateExpenseNotes(index: Int, notes: String) {
+        _uiState.update { state ->
+            val updated = state.expenses.toMutableList()
+            updated[index] = updated[index].copy(notes = notes)
+            state.copy(expenses = updated)
         }
     }
 
@@ -129,6 +160,26 @@ class BudgetViewModel @Inject constructor(
             state.copy(expenses = updated)
         }
     }
+
+    fun sortExpenses(order: ExpenseSortOrder) {
+        _uiState.update { state ->
+            val sorted = state.expenses.sortedWith(
+                when (order) {
+                    ExpenseSortOrder.AMOUNT_DESC -> compareByDescending { it.amountAsDouble }
+                    ExpenseSortOrder.AMOUNT_ASC -> compareBy { it.amountAsDouble }
+                    ExpenseSortOrder.CATEGORY -> compareBy { it.category.label }
+                    ExpenseSortOrder.PAID_FIRST -> compareByDescending { it.isPaid }
+                }
+            )
+            state.copy(expenses = sorted)
+        }
+    }
+
+    // ── Clear session ─────────────────────────────────────────────────────────
+
+    fun requestClearSession() { _uiState.update { it.copy(showClearConfirmDialog = true) } }
+    fun dismissClearDialog()  { _uiState.update { it.copy(showClearConfirmDialog = false) } }
+    fun confirmClearSession() { _uiState.value = BudgetUiState() }
 
     // ── Receipt handling ──────────────────────────────────────────────────────
 
@@ -259,7 +310,8 @@ class BudgetViewModel @Inject constructor(
                     name = state.sessionName.ifBlank { defaultName },
                     initialBudget = state.initialBudget.replace(",", "").toDoubleOrNull() ?: 0.0,
                     updatedAt = System.currentTimeMillis(),
-                    budgetDate = state.selectedDate
+                    budgetDate = state.selectedDate,
+                    goalAmount = state.goalAmount.replace(",", "").toDoubleOrNull() ?: 0.0
                 )
 
                 val newSessionId = repository.saveSession(sessionEntity)
@@ -275,7 +327,8 @@ class BudgetViewModel @Inject constructor(
                             isPaid = expense.isPaid,
                             receiptPath = expense.receiptPath,
                             category = expense.category.name,
-                            isRecurring = expense.isRecurring
+                            isRecurring = expense.isRecurring,
+                            notes = expense.notes
                         )
                     }
 

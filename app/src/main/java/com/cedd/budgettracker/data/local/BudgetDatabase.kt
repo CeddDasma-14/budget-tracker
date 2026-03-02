@@ -19,7 +19,7 @@ import com.cedd.budgettracker.data.local.entity.TemplateExpenseEntity
         TemplateEntity::class,
         TemplateExpenseEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class BudgetDatabase : RoomDatabase() {
@@ -28,6 +28,14 @@ abstract class BudgetDatabase : RoomDatabase() {
     abstract fun templateDao(): TemplateDao
 
     companion object {
+        /** v3 → v4: add notes to expenses; add goalAmount to budget_sessions. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE expenses ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE budget_sessions ADD COLUMN goalAmount REAL NOT NULL DEFAULT 0")
+            }
+        }
+
         /** v2 → v3: add budgetDate to budget_sessions. Existing rows default to 0 (fallback to createdAt). */
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {

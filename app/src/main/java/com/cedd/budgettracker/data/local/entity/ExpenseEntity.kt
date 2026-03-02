@@ -32,5 +32,6 @@ data class ExpenseEntity(
     val isPaid: Boolean = false,
     val receiptPath: String? = null,
     val category: String = "OTHER",         // ExpenseCategory.name — added in DB v2
-    val isRecurring: Boolean = false        // Added in DB v2
+    val isRecurring: Boolean = false,       // Added in DB v2
+    val notes: String = ""                  // Added in DB v4
 )

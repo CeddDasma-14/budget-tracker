@@ -15,5 +15,7 @@ data class BudgetSessionEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     /** User-selected date for this budget period (millis). Falls back to createdAt if 0. Added in DB v3. */
-    val budgetDate: Long = System.currentTimeMillis()
+    val budgetDate: Long = System.currentTimeMillis(),
+    /** Optional savings goal — remaining balance should reach this amount. Added in DB v4. */
+    val goalAmount: Double = 0.0
 )

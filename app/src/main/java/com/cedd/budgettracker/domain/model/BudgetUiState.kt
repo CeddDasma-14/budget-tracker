@@ -1,5 +1,7 @@
 package com.cedd.budgettracker.domain.model
 
+enum class ExpenseSortOrder { AMOUNT_DESC, AMOUNT_ASC, CATEGORY, PAID_FIRST }
+
 /**
  * Single source of truth for the active budget editor screen.
  *
@@ -12,6 +14,8 @@ data class BudgetUiState(
     val sessionName: String = "",
     /** Raw string so the TextField can hold intermediate input (empty, partial decimals, etc.) */
     val initialBudget: String = "",
+    /** Optional savings goal — user wants this much left at the end. Raw string. */
+    val goalAmount: String = "",
     val expenses: List<ExpenseUiModel> = listOf(ExpenseUiModel()),   // Start with one empty row
 
     // ── Derived ──────────────────────────────────────────────────────────────
@@ -34,5 +38,11 @@ data class BudgetUiState(
 
     // ── Date ──────────────────────────────────────────────────────────────────
     /** User-selected budget date in millis. Defaults to today. */
-    val selectedDate: Long = System.currentTimeMillis()
+    val selectedDate: Long = System.currentTimeMillis(),
+
+    // ── Undo delete ───────────────────────────────────────────────────────────
+    val recentlyDeletedExpense: ExpenseUiModel? = null,
+
+    // ── Confirm clear ─────────────────────────────────────────────────────────
+    val showClearConfirmDialog: Boolean = false
 )

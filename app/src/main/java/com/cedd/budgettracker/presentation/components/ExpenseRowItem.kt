@@ -51,6 +51,7 @@ fun ExpenseRowItem(
     rowIndex: Int,
     onTitleChange: (String) -> Unit,
     onAmountChange: (String) -> Unit,
+    onNotesChange: (String) -> Unit,
     onPaidToggle: () -> Unit,
     onRemoveRow: () -> Unit,
     onToggleLock: () -> Unit,
@@ -65,13 +66,16 @@ fun ExpenseRowItem(
     ) { uri -> uri?.let { onReceiptPicked(it) } }
 
     val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) {
-                onRemoveRow()
-                true
-            } else false
-        }
+        confirmValueChange = { it == SwipeToDismissBoxValue.EndToStart }
     )
+
+    LaunchedEffect(dismissState.currentValue) {
+        if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+            onRemoveRow()
+            // Reset in case removal was rejected (e.g. last remaining row)
+            dismissState.reset()
+        }
+    }
 
     SwipeToDismissBox(
         state = dismissState,
@@ -100,6 +104,7 @@ fun ExpenseRowItem(
             rowIndex = rowIndex,
             onTitleChange = onTitleChange,
             onAmountChange = onAmountChange,
+            onNotesChange = onNotesChange,
             onPaidToggle = onPaidToggle,
             onRemoveRow = onRemoveRow,
             onToggleLock = onToggleLock,
@@ -121,6 +126,7 @@ private fun ExpenseCard(
     rowIndex: Int,
     onTitleChange: (String) -> Unit,
     onAmountChange: (String) -> Unit,
+    onNotesChange: (String) -> Unit,
     onPaidToggle: () -> Unit,
     onRemoveRow: () -> Unit,
     onToggleLock: () -> Unit,
@@ -181,6 +187,7 @@ private fun ExpenseCard(
                 rowIndex = rowIndex,
                 onTitleChange = onTitleChange,
                 onAmountChange = onAmountChange,
+                onNotesChange = onNotesChange,
                 onPaidToggle = onPaidToggle,
                 onRemoveRow = onRemoveRow,
                 onLock = onToggleLock,
@@ -285,6 +292,16 @@ private fun LockedRow(
                     )
                 }
             }
+            if (expense.notes.isNotBlank()) {
+                Text(
+                    text = expense.notes,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 10.sp
+                )
+            }
             if (expense.receiptPath != null) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -372,6 +389,7 @@ private fun EditableRow(
     rowIndex: Int,
     onTitleChange: (String) -> Unit,
     onAmountChange: (String) -> Unit,
+    onNotesChange: (String) -> Unit,
     onPaidToggle: () -> Unit,
     onRemoveRow: () -> Unit,
     onLock: () -> Unit,
@@ -431,6 +449,25 @@ private fun EditableRow(
             },
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Words,
+                imeAction = ImeAction.Next
+            ),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        // Notes field
+        OutlinedTextField(
+            value = expense.notes,
+            onValueChange = onNotesChange,
+            placeholder = { Text("Add a note… (optional)") },
+            singleLine = true,
+            leadingIcon = {
+                Icon(Icons.Default.Notes, contentDescription = null, modifier = Modifier.size(18.dp))
+            },
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
                 imeAction = ImeAction.Next
             ),
             shape = RoundedCornerShape(10.dp),

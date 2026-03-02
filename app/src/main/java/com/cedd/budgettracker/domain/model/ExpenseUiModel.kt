@@ -8,7 +8,8 @@ data class ExpenseUiModel(
     val receiptPath: String? = null,
     val isLocked: Boolean = false,
     val category: ExpenseCategory = ExpenseCategory.OTHER,
-    val isRecurring: Boolean = false
+    val isRecurring: Boolean = false,
+    val notes: String = ""
 ) {
     val amountAsDouble: Double get() = amount.replace(",", "").toDoubleOrNull() ?: 0.0
     val hasContent: Boolean get() = title.isNotBlank() || amountAsDouble > 0
