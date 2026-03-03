@@ -1,6 +1,11 @@
 package com.cedd.budgettracker.presentation.components
 
+import android.content.ContentValues
+import android.content.Context
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,6 +16,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,7 +41,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.clickable
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
@@ -45,6 +50,9 @@ import com.cedd.budgettracker.domain.model.ExpenseUiModel
 import com.cedd.budgettracker.presentation.utils.CurrencyUtils
 import com.cedd.budgettracker.presentation.utils.ThousandSeparatorTransformation
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -220,7 +228,10 @@ private fun ExpenseCard(
 // ── Full-screen image preview dialog ──────────────────────────────────────────
 
 @Composable
-private fun FullScreenImageDialog(path: String, onDismiss: () -> Unit) {
+internal fun FullScreenImageDialog(path: String, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val scope   = rememberCoroutineScope()
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -229,17 +240,78 @@ private fun FullScreenImageDialog(path: String, onDismiss: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                .clickable(onClick = onDismiss),
-            contentAlignment = Alignment.Center
         ) {
+            // Image — tap anywhere to close
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
+                model = ImageRequest.Builder(context)
                     .data(File(path)).crossfade(true).build(),
                 contentDescription = "Receipt full screen",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(onClick = onDismiss)
             )
+
+            // Top bar: close on left, title center, download on right
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopStart)
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .statusBarsPadding()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                }
+                Text("Receipt", color = Color.White, fontWeight = FontWeight.SemiBold)
+                IconButton(onClick = {
+                    scope.launch(Dispatchers.IO) {
+                        val saved = saveReceiptToGallery(context, path)
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(
+                                context,
+                                if (saved) "Saved to gallery" else "Failed to save image",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }) {
+                    Icon(Icons.Default.Download, contentDescription = "Save to gallery", tint = Color.White)
+                }
+            }
         }
+    }
+}
+
+private fun saveReceiptToGallery(context: Context, imagePath: String): Boolean {
+    return try {
+        val source   = File(imagePath)
+        val fileName = "CeddFlow_receipt_${System.currentTimeMillis()}.jpg"
+        val values   = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CeddFlow")
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            }
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            ?: return false
+        resolver.openOutputStream(uri)?.use { out ->
+            source.inputStream().use { it.copyTo(out) }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            values.clear()
+            values.put(MediaStore.Images.Media.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+        }
+        true
+    } catch (e: Exception) {
+        false
     }
 }
 

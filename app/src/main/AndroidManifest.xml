@@ -5,6 +5,10 @@
     <!-- Photo picker + camera -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Save receipts to gallery (only required on Android 8/9; API 29+ uses MediaStore) -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
     <!-- Push notifications (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Reschedule reminders after reboot -->

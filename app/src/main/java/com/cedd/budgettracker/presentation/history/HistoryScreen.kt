@@ -39,6 +39,8 @@ import coil.request.ImageRequest
 import com.cedd.budgettracker.data.local.entity.ExpenseEntity
 import com.cedd.budgettracker.data.local.relation.BudgetSessionWithExpenses
 import com.cedd.budgettracker.domain.model.ExpenseCategory
+import androidx.compose.foundation.clickable
+import com.cedd.budgettracker.presentation.components.FullScreenImageDialog
 import com.cedd.budgettracker.presentation.components.MonthlySpendingChart
 import com.cedd.budgettracker.presentation.components.SpendingInsightsCard
 import com.cedd.budgettracker.presentation.utils.CurrencyUtils
@@ -480,6 +482,15 @@ private fun SessionHistoryCard(
 
 @Composable
 private fun ExpenseHistoryRow(expense: ExpenseEntity) {
+    var showFullScreen by remember { mutableStateOf(false) }
+
+    if (showFullScreen && expense.receiptPath != null) {
+        FullScreenImageDialog(
+            path      = expense.receiptPath,
+            onDismiss = { showFullScreen = false }
+        )
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -524,12 +535,34 @@ private fun ExpenseHistoryRow(expense: ExpenseEntity) {
             fontSize = 14.sp
         )
         expense.receiptPath?.let { path ->
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(File(path)).crossfade(true).build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(6.dp))
-            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { showFullScreen = true }
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(File(path)).crossfade(true).build(),
+                    contentDescription = "Tap to view receipt",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                // Small expand hint overlay in bottom-right corner
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(14.dp)
+                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(topStart = 4.dp))
+                ) {
+                    Icon(
+                        Icons.Default.Fullscreen,
+                        contentDescription = null,
+                        tint     = Color.White,
+                        modifier = Modifier.fillMaxSize().padding(2.dp)
+                    )
+                }
+            }
         }
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
@@ -590,7 +623,7 @@ private fun BudgetMetric(
 
 // ── Edit session bottom sheet ──────────────────────────────────────────────────
 
-private val SheetBg     = Color(0xCC1E3252)
+private val SheetBg     = Color(0xFF0F2035)   // Opaque — no background bleed-through
 private val SheetBorder = Color(0xFF1B3A5C)
 private val NeonBlue    = Color(0xFF38BDF8)
 
@@ -803,11 +836,14 @@ private fun EditSessionSheet(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B3A5C))
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF1B3A5C),
+                    contentColor   = Color.White
+                )
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Add Expense", fontWeight = FontWeight.SemiBold)
+                Text("Add Expense", fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     }
@@ -823,7 +859,7 @@ private fun EditableExpenseRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0x601E3252), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+            .background(Color(0xFF0C1829), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
