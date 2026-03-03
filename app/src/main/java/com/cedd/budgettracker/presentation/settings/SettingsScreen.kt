@@ -11,32 +11,44 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onNavigateBack: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
-    val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
     val isReminderEnabled by viewModel.isReminderEnabled.collectAsStateWithLifecycle()
     val reminderHour by viewModel.reminderHour.collectAsStateWithLifecycle()
     val reminderMinute by viewModel.reminderMinute.collectAsStateWithLifecycle()
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                title = {
+                    Column {
+                        Text(
+                            "Settings",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 20.sp,
+                            color = androidx.compose.ui.graphics.Color.White
+                        )
+                        Text(
+                            "Notifications & About",
+                            fontSize = 11.sp,
+                            color = androidx.compose.ui.graphics.Color(0xFF38BDF8),
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 0.8.sp
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    scrolledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    titleContentColor = androidx.compose.ui.graphics.Color.White
                 )
             )
         }
@@ -49,17 +61,6 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-
-            // ── Appearance ────────────────────────────────────────────────────
-            SettingsSection(title = "Appearance") {
-                SettingsToggleRow(
-                    icon = Icons.Default.DarkMode,
-                    title = "Dark Mode",
-                    subtitle = "Switch to a dark color theme",
-                    checked = isDarkMode,
-                    onCheckedChange = viewModel::toggleDarkMode
-                )
-            }
 
             // ── Notifications ─────────────────────────────────────────────────
             SettingsSection(title = "Notifications") {
@@ -128,7 +129,7 @@ private fun SettingsSection(
         )
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0x801E3252))
         ) {
             Column(content = content)
         }

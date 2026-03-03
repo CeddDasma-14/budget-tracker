@@ -38,9 +38,17 @@ data class HistoryUiState(
     val selectedYearMonth: YearMonth? = null,
     /** Search query for filtering sessions by name. */
     val searchQuery: String = "",
-    /** Non-null while snackbar "copied as template" is shown. */
-    val templateSavedMessage: String? = null
+    /** Non-null while snackbar message is shown (templates OR edit saves). */
+    val templateSavedMessage: String? = null,
+    /** ID of the session currently open in the edit sheet. Null = sheet hidden. */
+    val editTargetSessionId: Long? = null,
+    val editSessionName: String = "",
+    val editInitialBudget: String = ""
 ) {
+    /** Live view of the edit target — auto-refreshes as DB changes propagate. */
+    val editTargetSession: BudgetSessionWithExpenses?
+        get() = editTargetSessionId?.let { id -> allSessions.firstOrNull { it.session.id == id } }
+
     /** Effective date for a session: budgetDate if set (>0), otherwise createdAt. */
     private fun effectiveDate(s: BudgetSessionWithExpenses): Long =
         if (s.session.budgetDate != 0L) s.session.budgetDate else s.session.createdAt
@@ -170,4 +178,75 @@ class HistoryViewModel @Inject constructor(
     }
 
     fun clearTemplateSavedMessage() { _uiState.update { it.copy(templateSavedMessage = null) } }
+
+    // ── Edit session (bottom sheet) ───────────────────────────────────────────
+
+    fun showEditSheet(session: BudgetSessionWithExpenses) {
+        val budgetStr = session.session.initialBudget
+            .toBigDecimal().stripTrailingZeros().toPlainString()
+        _uiState.update { it.copy(
+            editTargetSessionId = session.session.id,
+            editSessionName     = session.session.name,
+            editInitialBudget   = budgetStr
+        ) }
+    }
+
+    fun hideEditSheet() {
+        _uiState.update { it.copy(
+            editTargetSessionId = null,
+            editSessionName     = "",
+            editInitialBudget   = ""
+        ) }
+    }
+
+    fun updateEditName(name: String) { _uiState.update { it.copy(editSessionName = name) } }
+
+    fun updateEditBudget(amount: String) { _uiState.update { it.copy(editInitialBudget = amount) } }
+
+    fun saveEditSession() {
+        val target = _uiState.value.editTargetSession ?: return
+        val name   = _uiState.value.editSessionName.trim()
+        val budget = _uiState.value.editInitialBudget.replace(",", "").toDoubleOrNull() ?: return
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            repository.updateSession(
+                target.session.copy(
+                    name          = name,
+                    initialBudget = budget,
+                    updatedAt     = System.currentTimeMillis()
+                )
+            )
+            // Close the sheet and show a visible Snackbar confirmation
+            _uiState.update { it.copy(
+                editTargetSessionId  = null,
+                editSessionName      = "",
+                editInitialBudget    = "",
+                templateSavedMessage = "\"$name\" updated successfully!"
+            ) }
+        }
+    }
+
+    fun addExpenseToSession(title: String, amount: Double, category: String) {
+        val sessionId = _uiState.value.editTargetSessionId ?: return
+        if (title.isBlank() || amount <= 0) return
+        viewModelScope.launch {
+            repository.saveExpenses(listOf(
+                ExpenseEntity(sessionId = sessionId, title = title.trim(), amount = amount, category = category)
+            ))
+        }
+    }
+
+    fun toggleExpensePaidInSession(expense: ExpenseEntity) {
+        viewModelScope.launch {
+            repository.saveExpenses(listOf(expense.copy(isPaid = !expense.isPaid)))
+        }
+    }
+
+    fun deleteExpenseInSession(expense: ExpenseEntity) {
+        viewModelScope.launch {
+            expense.receiptPath?.let { repository.deleteReceiptImage(it) }
+            repository.deleteExpense(expense)
+        }
+    }
+
 }

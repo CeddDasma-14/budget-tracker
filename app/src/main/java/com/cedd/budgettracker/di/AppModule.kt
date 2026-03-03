@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.cedd.budgettracker.data.local.BudgetDatabase
 import com.cedd.budgettracker.data.local.dao.BudgetSessionDao
 import com.cedd.budgettracker.data.local.dao.ExpenseDao
+import com.cedd.budgettracker.data.local.dao.GoalDao
 import com.cedd.budgettracker.data.local.dao.TemplateDao
 import dagger.Module
 import dagger.Provides
@@ -21,7 +22,12 @@ object AppModule {
     @Provides
     fun provideBudgetDatabase(@ApplicationContext context: Context): BudgetDatabase =
         Room.databaseBuilder(context, BudgetDatabase::class.java, "budget_tracker.db")
-            .addMigrations(BudgetDatabase.MIGRATION_1_2, BudgetDatabase.MIGRATION_2_3, BudgetDatabase.MIGRATION_3_4)
+            .addMigrations(
+                BudgetDatabase.MIGRATION_1_2,
+                BudgetDatabase.MIGRATION_2_3,
+                BudgetDatabase.MIGRATION_3_4,
+                BudgetDatabase.MIGRATION_4_5
+            )
             .build()
 
     @Singleton @Provides
@@ -32,4 +38,7 @@ object AppModule {
 
     @Singleton @Provides
     fun provideTemplateDao(db: BudgetDatabase): TemplateDao = db.templateDao()
+
+    @Singleton @Provides
+    fun provideGoalDao(db: BudgetDatabase): GoalDao = db.goalDao()
 }

@@ -19,13 +19,9 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class PreferencesRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    private val DARK_MODE_KEY       = booleanPreferencesKey("dark_mode")
     private val REMINDER_ENABLED    = booleanPreferencesKey("reminder_enabled")
     private val REMINDER_HOUR       = intPreferencesKey("reminder_hour")
     private val REMINDER_MINUTE     = intPreferencesKey("reminder_minute")
-
-    val isDarkMode: Flow<Boolean> = context.dataStore.data
-        .map { it[DARK_MODE_KEY] ?: false }
 
     val isReminderEnabled: Flow<Boolean> = context.dataStore.data
         .map { it[REMINDER_ENABLED] ?: false }
@@ -35,10 +31,6 @@ class PreferencesRepository @Inject constructor(
 
     val reminderMinute: Flow<Int> = context.dataStore.data
         .map { it[REMINDER_MINUTE] ?: 0 }
-
-    suspend fun setDarkMode(enabled: Boolean) {
-        context.dataStore.edit { it[DARK_MODE_KEY] = enabled }
-    }
 
     suspend fun setReminder(enabled: Boolean, hour: Int = 20, minute: Int = 0) {
         context.dataStore.edit {

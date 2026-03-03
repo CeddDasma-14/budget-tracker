@@ -10,10 +10,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +27,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,6 +42,7 @@ import com.cedd.budgettracker.domain.model.ExpenseCategory
 import com.cedd.budgettracker.presentation.components.MonthlySpendingChart
 import com.cedd.budgettracker.presentation.components.SpendingInsightsCard
 import com.cedd.budgettracker.presentation.utils.CurrencyUtils
+import com.cedd.budgettracker.presentation.utils.ThousandSeparatorTransformation
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import java.io.File
@@ -44,31 +53,63 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
-    onNavigateBack: () -> Unit,
     viewModel: HistoryViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(state.templateSavedMessage) {
-        state.templateSavedMessage?.let {
-            snackbarHostState.showSnackbar("$it — load it from Budget screen \uD83D\uDCCB")
+        state.templateSavedMessage?.let { msg ->
+            val display = if (msg.contains("updated successfully"))
+                msg  // edit-save message — show as-is
+            else
+                "$msg — load it from Budget screen \uD83D\uDCCB"  // template-copy message
+            snackbarHostState.showSnackbar(display)
             viewModel.clearTemplateSavedMessage()
         }
     }
 
+    // Edit session bottom sheet
+    state.editTargetSession?.let { session ->
+        EditSessionSheet(
+            session        = session,
+            editName       = state.editSessionName,
+            editBudget     = state.editInitialBudget,
+            onNameChange   = viewModel::updateEditName,
+            onBudgetChange = viewModel::updateEditBudget,
+            onSave         = viewModel::saveEditSession,
+            onTogglePaid   = viewModel::toggleExpensePaidInSession,
+            onDeleteExpense = viewModel::deleteExpenseInSession,
+            onAddExpense   = { title, amount, category -> viewModel.addExpenseToSession(title, amount, category) },
+            onDismiss      = viewModel::hideEditSheet
+        )
+    }
+
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("Budget History", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                title = {
+                    Column {
+                        Text(
+                            "History",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 20.sp,
+                            color = Color.White
+                        )
+                        Text(
+                            "Past Budget Sessions",
+                            fontSize = 11.sp,
+                            color = Color(0xFF38BDF8),
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 0.8.sp
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
+                    titleContentColor = Color.White
                 )
             )
         },
@@ -148,7 +189,7 @@ fun HistoryScreen(
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp),
                                 shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                colors = CardDefaults.cardColors(containerColor = Color(0x801E3252))
                             ) {
                                 MonthlySpendingChart(
                                     sessions = state.allSessions,
@@ -224,6 +265,7 @@ fun HistoryScreen(
                                 onDeleteRequest = { viewModel.requestDeleteSession(sessionWithExpenses.session.id) },
                                 onExportCsv = { viewModel.exportCsv(sessionWithExpenses.session.id) },
                                 onCopyAsTemplate = { viewModel.saveSessionAsTemplate(sessionWithExpenses.session.id) },
+                                onEditRequest = { viewModel.showEditSheet(sessionWithExpenses) },
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             )
                         }
@@ -263,6 +305,7 @@ private fun SessionHistoryCard(
     onDeleteRequest: () -> Unit,
     onExportCsv: () -> Unit,
     onCopyAsTemplate: () -> Unit,
+    onEditRequest: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val session = sessionWithExpenses.session
@@ -303,6 +346,14 @@ private fun SessionHistoryCard(
                             )
                         }
                         Row {
+                            // Edit session
+                            IconButton(onClick = onEditRequest) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Edit Session",
+                                    tint = Color(0xFF38BDF8).copy(alpha = 0.8f)
+                                )
+                            }
                             // Copy as template
                             IconButton(onClick = onCopyAsTemplate) {
                                 Icon(
@@ -534,6 +585,292 @@ private fun BudgetMetric(
             fontWeight = FontWeight.Bold
         )
         Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = valueColor)
+    }
+}
+
+// ── Edit session bottom sheet ──────────────────────────────────────────────────
+
+private val SheetBg     = Color(0xCC1E3252)
+private val SheetBorder = Color(0xFF1B3A5C)
+private val NeonBlue    = Color(0xFF38BDF8)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditSessionSheet(
+    session: BudgetSessionWithExpenses,
+    editName: String,
+    editBudget: String,
+    onNameChange: (String) -> Unit,
+    onBudgetChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onTogglePaid: (ExpenseEntity) -> Unit,
+    onDeleteExpense: (ExpenseEntity) -> Unit,
+    onAddExpense: (title: String, amount: Double, category: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var addTitle    by remember { mutableStateOf("") }
+    var addAmount   by remember { mutableStateOf("") }
+    var addCategory by remember { mutableStateOf(ExpenseCategory.OTHER) }
+    var catExpanded by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState       = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor   = SheetBg,
+        contentColor     = Color.White
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // ── Header ────────────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = null, tint = NeonBlue, modifier = Modifier.size(18.dp))
+                Text("Edit Session", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color.White)
+            }
+
+            // ── Session fields ─────────────────────────────────────────────
+            val fieldColors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor       = Color.White,
+                unfocusedTextColor     = Color.White,
+                focusedLabelColor      = Color.White.copy(alpha = 0.8f),
+                unfocusedLabelColor    = Color.White.copy(alpha = 0.6f),
+                focusedPlaceholderColor   = Color.White.copy(alpha = 0.4f),
+                unfocusedPlaceholderColor = Color.White.copy(alpha = 0.4f),
+                focusedLeadingIconColor   = Color.White,
+                unfocusedLeadingIconColor = Color.White.copy(alpha = 0.6f),
+                focusedBorderColor     = NeonBlue,
+                unfocusedBorderColor   = SheetBorder,
+                cursorColor            = Color.White,
+                focusedContainerColor  = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                focusedPrefixColor     = Color.White,
+                unfocusedPrefixColor   = Color.White,
+            )
+
+            OutlinedTextField(
+                value = editName,
+                onValueChange = onNameChange,
+                label = { Text("Session Name") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = fieldColors
+            )
+
+            OutlinedTextField(
+                value = editBudget,
+                onValueChange = { onBudgetChange(CurrencyUtils.cleanAmountInput(it)) },
+                label = { Text("Initial Budget") },
+                singleLine = true,
+                prefix = { Text("₱", fontWeight = FontWeight.Bold) },
+                visualTransformation = ThousandSeparatorTransformation,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+                colors = fieldColors
+            )
+
+            Button(
+                onClick = onSave,
+                modifier = Modifier.fillMaxWidth(),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0EA5E9))
+            ) {
+                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Save Changes", fontWeight = FontWeight.SemiBold)
+            }
+
+            // ── Expenses ───────────────────────────────────────────────────
+            HorizontalDivider(color = SheetBorder)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "EXPENSES",
+                    fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                    color = NeonBlue, letterSpacing = 1.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "${session.expenses.size} item(s)",
+                    fontSize = 10.sp, color = Color(0xFF64748B)
+                )
+            }
+
+            if (session.expenses.isEmpty()) {
+                Text(
+                    "No expenses yet. Add one below.",
+                    fontSize = 12.sp, color = Color(0xFF64748B),
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            } else {
+                session.expenses.forEach { expense ->
+                    EditableExpenseRow(
+                        expense    = expense,
+                        onTogglePaid = { onTogglePaid(expense) },
+                        onDelete   = { onDeleteExpense(expense) }
+                    )
+                }
+            }
+
+            // ── Add expense ────────────────────────────────────────────────
+            HorizontalDivider(color = SheetBorder)
+
+            Text(
+                "ADD EXPENSE",
+                fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                color = NeonBlue, letterSpacing = 1.sp
+            )
+
+            OutlinedTextField(
+                value = addTitle,
+                onValueChange = { addTitle = it },
+                label = { Text("Title") },
+                placeholder = { Text("e.g. Groceries") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                modifier = Modifier.fillMaxWidth(),
+                colors = fieldColors
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = addAmount,
+                    onValueChange = { addAmount = CurrencyUtils.cleanAmountInput(it) },
+                    label = { Text("Amount") },
+                    singleLine = true,
+                    prefix = { Text("₱", fontWeight = FontWeight.Bold) },
+                    visualTransformation = ThousandSeparatorTransformation,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.weight(1f),
+                    colors = fieldColors
+                )
+
+                ExposedDropdownMenuBox(
+                    expanded = catExpanded,
+                    onExpandedChange = { catExpanded = it },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    OutlinedTextField(
+                        value = "${addCategory.emoji} ${addCategory.label}",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Category") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(catExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                        colors = fieldColors
+                    )
+                    ExposedDropdownMenu(
+                        expanded = catExpanded,
+                        onDismissRequest = { catExpanded = false }
+                    ) {
+                        ExpenseCategory.entries.forEach { cat ->
+                            DropdownMenuItem(
+                                text = { Text("${cat.emoji} ${cat.label}") },
+                                onClick = { addCategory = cat; catExpanded = false }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Button(
+                onClick = {
+                    val amt = addAmount.replace(",", "").toDoubleOrNull() ?: 0.0
+                    if (addTitle.isNotBlank() && amt > 0) {
+                        onAddExpense(addTitle, amt, addCategory.name)
+                        addTitle  = ""
+                        addAmount = ""
+                        addCategory = ExpenseCategory.OTHER
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B3A5C))
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Add Expense", fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditableExpenseRow(
+    expense: ExpenseEntity,
+    onTogglePaid: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val cat = ExpenseCategory.fromName(expense.category)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0x601E3252), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Category bubble
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(cat.color.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) { Text(cat.emoji, fontSize = 13.sp) }
+
+        // Title + amount
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = expense.title.ifBlank { "(Untitled)" },
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (expense.isPaid) Color(0xFF64748B) else Color.White,
+                textDecoration = if (expense.isPaid) TextDecoration.LineThrough else null
+            )
+            Text(
+                text = CurrencyUtils.formatPhp(expense.amount),
+                fontSize = 11.sp, color = cat.color
+            )
+        }
+
+        // Paid toggle
+        IconButton(onClick = onTogglePaid, modifier = Modifier.size(32.dp)) {
+            Icon(
+                imageVector = if (expense.isPaid) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                contentDescription = "Toggle paid",
+                tint = if (expense.isPaid) Color(0xFF34D399) else Color(0xFF64748B),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        // Delete
+        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+            Icon(
+                Icons.Default.Delete,
+                contentDescription = "Delete expense",
+                tint = Color(0xFFF87171).copy(alpha = 0.7f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
 }
 

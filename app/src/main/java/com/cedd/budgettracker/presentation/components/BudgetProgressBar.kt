@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cedd.budgettracker.presentation.utils.glowEffect
 
 @Composable
 fun BudgetProgressBar(
@@ -23,53 +24,77 @@ fun BudgetProgressBar(
     modifier: Modifier = Modifier
 ) {
     val progress = if (total > 0) (spent / total).coerceIn(0.0, 1.0).toFloat() else 0f
-    val pct = (progress * 100).toInt()
+    val pct      = (progress * 100).toInt()
 
     val barColor by animateColorAsState(
         targetValue = when {
-            progress >= 1f   -> Color(0xFFD32F2F)  // Red — over budget
-            progress >= 0.8f -> Color(0xFFFF6F00)  // Amber — warning
-            progress >= 0.5f -> Color(0xFFF9A825)  // Yellow — caution
-            else             -> Color(0xFF00BFA5)  // Teal Green — healthy
+            progress >= 1f   -> Color(0xFFF87171)   // Red — over budget
+            progress >= 0.8f -> Color(0xFFFBBF24)   // Amber — warning
+            progress >= 0.5f -> Color(0xFFF59E0B)   // Orange — caution
+            else             -> Color(0xFF38BDF8)   // Electric Blue — healthy
         },
         animationSpec = tween(400),
-        label = "bar_color"
+        label         = "bar_color"
     )
 
     val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = tween(600),
-        label = "progress"
+        targetValue   = progress,
+        animationSpec = tween(800),
+        label         = "progress"
     )
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment     = Alignment.CenterVertically
         ) {
             Text(
-                text = "Budget Used",
+                text  = "BUDGET USED",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                color = Color(0xFF94A3B8),
+                letterSpacing = 0.8.sp,
+                fontSize = 10.sp
             )
             Text(
-                text = "$pct%",
-                style = MaterialTheme.typography.labelSmall,
+                text       = "$pct%",
+                fontSize   = 11.sp,
                 fontWeight = FontWeight.Bold,
-                color = barColor,
-                fontSize = 11.sp
+                color      = barColor
             )
         }
-        Spacer(Modifier.height(4.dp))
-        LinearProgressIndicator(
-            progress = { animatedProgress },
+
+        Spacer(Modifier.height(6.dp))
+
+        // Glowing progress track
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp)),
-            color = barColor,
-            trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
-        )
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+        ) {
+            // Track background
+            LinearProgressIndicator(
+                progress              = { 1f },
+                modifier              = Modifier.fillMaxSize(),
+                color                 = Color(0xFF1B3A5C),
+                trackColor            = Color(0xFF1B3A5C)
+            )
+            // Filled bar with glow
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(animatedProgress)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(4.dp))
+                    .glowEffect(barColor, glowRadius = 10.dp, cornerRadius = 4.dp)
+            ) {
+                LinearProgressIndicator(
+                    progress   = { 1f },
+                    modifier   = Modifier.fillMaxSize(),
+                    color      = barColor,
+                    trackColor = barColor
+                )
+            }
+        }
     }
 }

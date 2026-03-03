@@ -9,12 +9,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cedd.budgettracker.data.local.relation.BudgetSessionWithExpenses
 import com.cedd.budgettracker.domain.model.ExpenseCategory
 import com.cedd.budgettracker.presentation.utils.CurrencyUtils
+import com.cedd.budgettracker.presentation.utils.glowEffect
+
+private val NeonBlue = Color(0xFF38BDF8)
+private val CardBg   = Color(0x801E3252)
+private val Border   = Color(0x20FFFFFF)
 
 data class CategoryInsight(
     val category: ExpenseCategory,
@@ -47,27 +53,30 @@ fun SpendingInsightsCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        shape    = RoundedCornerShape(16.dp),
+        colors   = CardDefaults.cardColors(containerColor = CardBg),
+        border   = androidx.compose.foundation.BorderStroke(1.dp, Border)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                "Spending Insights",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                "SPENDING INSIGHTS",
+                style         = MaterialTheme.typography.labelSmall,
+                fontWeight    = FontWeight.Bold,
+                color         = NeonBlue,
+                letterSpacing = 1.sp,
+                fontSize      = 10.sp
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(2.dp))
             Text(
                 "Top categories across all sessions",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                color = Color(0xFF64748B)
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
 
             insights.forEach { insight ->
                 InsightRow(insight)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
             }
         }
     }
@@ -77,53 +86,62 @@ fun SpendingInsightsCard(
 private fun InsightRow(insight: CategoryInsight) {
     Column {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier              = Modifier.fillMaxWidth(),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Box(
-                modifier = Modifier
-                    .size(28.dp)
+                modifier         = Modifier
+                    .size(32.dp)
                     .clip(CircleShape)
-                    .background(insight.category.color.copy(alpha = 0.2f)),
+                    .background(insight.category.color.copy(alpha = 0.15f))
+                    .glowEffect(insight.category.color, glowRadius = 8.dp, cornerRadius = 16.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(insight.category.emoji, fontSize = 13.sp)
+                Text(insight.category.emoji, fontSize = 15.sp)
             }
 
             Text(
-                text = insight.category.label,
-                style = MaterialTheme.typography.bodySmall,
+                text       = insight.category.label,
+                style      = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                modifier   = Modifier.weight(1f),
+                color      = Color(0xFFCBD5E1)
             )
 
-            Text(
-                text = "${insight.percentage.toInt()}%",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = insight.category.color,
-                fontSize = 11.sp
-            )
-
-            Text(
-                text = CurrencyUtils.formatPhp(insight.total),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 11.sp
-            )
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text       = CurrencyUtils.formatPhp(insight.total),
+                    style      = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color      = Color(0xFFF0F9FF),
+                    fontSize   = 11.sp
+                )
+                Text(
+                    text     = "${insight.percentage.toInt()}%",
+                    fontSize = 10.sp,
+                    color    = insight.category.color
+                )
+            }
         }
 
-        Spacer(Modifier.height(3.dp))
-        LinearProgressIndicator(
-            progress = { (insight.percentage / 100f).coerceIn(0f, 1f) },
+        Spacer(Modifier.height(5.dp))
+
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(3.dp)
-                .clip(RoundedCornerShape(2.dp)),
-            color = insight.category.color,
-            trackColor = insight.category.color.copy(alpha = 0.15f)
-        )
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Border)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth((insight.percentage / 100f).coerceIn(0f, 1f))
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(2.dp))
+                    .glowEffect(insight.category.color, glowRadius = 6.dp, cornerRadius = 2.dp)
+                    .background(insight.category.color)
+            )
+        }
     }
 }

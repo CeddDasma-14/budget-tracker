@@ -19,9 +19,6 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    val isDarkMode: StateFlow<Boolean> = prefsRepository.isDarkMode
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
     val isReminderEnabled: StateFlow<Boolean> = prefsRepository.isReminderEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
@@ -30,10 +27,6 @@ class SettingsViewModel @Inject constructor(
 
     val reminderMinute: StateFlow<Int> = prefsRepository.reminderMinute
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
-
-    fun toggleDarkMode(enabled: Boolean) {
-        viewModelScope.launch { prefsRepository.setDarkMode(enabled) }
-    }
 
     fun setReminder(enabled: Boolean, hour: Int, minute: Int) {
         viewModelScope.launch {
