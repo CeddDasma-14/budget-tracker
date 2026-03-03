@@ -42,7 +42,15 @@ data class BudgetUiState(
 
     // ── Undo delete ───────────────────────────────────────────────────────────
     val recentlyDeletedExpense: ExpenseUiModel? = null,
+    /** Increments on every deletion so LaunchedEffect always re-triggers, even for the same expense data */
+    val deletionEventId: Int = 0,
 
     // ── Confirm clear ─────────────────────────────────────────────────────────
-    val showClearConfirmDialog: Boolean = false
+    val showClearConfirmDialog: Boolean = false,
+
+    // ── Recurring carry ───────────────────────────────────────────────────────
+    /** True while the "carry over recurring expenses?" dialog is shown. */
+    val showRecurringCarryDialog: Boolean = false,
+    /** Recurring expenses from the last saved session, pending user decision. */
+    val pendingRecurringExpenses: List<ExpenseUiModel> = emptyList()
 )

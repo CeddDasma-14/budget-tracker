@@ -6,12 +6,18 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import com.cedd.budgettracker.data.local.dao.BudgetSessionDao
 import com.cedd.budgettracker.data.local.dao.ExpenseDao
+import com.cedd.budgettracker.data.local.dao.GoalDao
 import com.cedd.budgettracker.data.local.dao.TemplateDao
 import com.cedd.budgettracker.data.local.entity.BudgetSessionEntity
 import com.cedd.budgettracker.data.local.entity.ExpenseEntity
+import com.cedd.budgettracker.data.local.entity.GoalContributionEntity
+import com.cedd.budgettracker.data.local.entity.GoalEntity
 import com.cedd.budgettracker.data.local.entity.TemplateEntity
 import com.cedd.budgettracker.data.local.entity.TemplateExpenseEntity
 import com.cedd.budgettracker.data.local.relation.BudgetSessionWithExpenses
+import androidx.glance.appwidget.updateAll
+import com.cedd.budgettracker.widget.BudgetWidget
+import com.cedd.budgettracker.data.local.relation.GoalWithContributions
 import com.cedd.budgettracker.data.local.relation.TemplateWithExpenses
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
@@ -35,13 +41,20 @@ class BudgetRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sessionDao: BudgetSessionDao,
     private val expenseDao: ExpenseDao,
-    private val templateDao: TemplateDao
+    private val templateDao: TemplateDao,
+    private val goalDao: GoalDao
 ) {
 
     // ── Sessions ──────────────────────────────────────────────────────────────
 
     fun getAllSessionsWithExpenses(): Flow<List<BudgetSessionWithExpenses>> =
         sessionDao.getAllSessionsWithExpenses()
+
+    suspend fun getLatestSessionWithExpenses(): BudgetSessionWithExpenses? =
+        sessionDao.getLatestSessionWithExpenses()
+
+    /** Tells the home-screen widget to re-query the DB and redraw. */
+    suspend fun updateWidget() = BudgetWidget().updateAll(context)
 
     suspend fun saveSession(session: BudgetSessionEntity): Long =
         sessionDao.insertSession(session)
@@ -85,6 +98,26 @@ class BudgetRepository @Inject constructor(
 
     suspend fun deleteTemplate(template: TemplateEntity) =
         templateDao.deleteTemplate(template)
+
+    // ── Goals ─────────────────────────────────────────────────────────────────
+
+    fun getAllGoals(): Flow<List<GoalWithContributions>> =
+        goalDao.getAllGoalsWithContributions()
+
+    suspend fun createGoal(goal: GoalEntity): Long =
+        goalDao.insertGoal(goal)
+
+    suspend fun updateGoal(goal: GoalEntity) =
+        goalDao.updateGoal(goal)
+
+    suspend fun deleteGoal(goal: GoalEntity) =
+        goalDao.deleteGoal(goal)
+
+    suspend fun addContribution(contribution: GoalContributionEntity) =
+        goalDao.insertContribution(contribution)
+
+    suspend fun deleteContribution(contribution: GoalContributionEntity) =
+        goalDao.deleteContribution(contribution)
 
     // ── Receipt image ─────────────────────────────────────────────────────────
 

@@ -83,13 +83,14 @@ class BudgetViewModel @Inject constructor(
 
     fun removeExpenseRow(index: Int) {
         _uiState.update { state ->
-            if (state.expenses.size <= 1) return@update state
             val deleted = state.expenses[index]
             val updated = state.expenses.toMutableList().also { it.removeAt(index) }
+            val finalList = if (updated.isEmpty()) listOf(ExpenseUiModel()) else updated
             state.copy(
-                expenses = updated,
-                remainingBalance = budgetValue(state) - updated.sumOf { it.amountAsDouble },
-                recentlyDeletedExpense = deleted
+                expenses = finalList,
+                remainingBalance = budgetValue(state) - finalList.sumOf { it.amountAsDouble },
+                recentlyDeletedExpense = deleted,
+                deletionEventId = state.deletionEventId + 1
             )
         }
     }
@@ -97,7 +98,7 @@ class BudgetViewModel @Inject constructor(
     fun undoDelete() {
         _uiState.update { state ->
             val deleted = state.recentlyDeletedExpense ?: return@update state
-            val updated = state.expenses + deleted.copy(isLocked = true)
+            val updated = state.expenses + deleted
             state.copy(
                 expenses = updated,
                 remainingBalance = budgetValue(state) - updated.sumOf { it.amountAsDouble },
@@ -179,7 +180,48 @@ class BudgetViewModel @Inject constructor(
 
     fun requestClearSession() { _uiState.update { it.copy(showClearConfirmDialog = true) } }
     fun dismissClearDialog()  { _uiState.update { it.copy(showClearConfirmDialog = false) } }
-    fun confirmClearSession() { _uiState.value = BudgetUiState() }
+
+    fun confirmClearSession() {
+        _uiState.update { it.copy(showClearConfirmDialog = false) }
+        viewModelScope.launch {
+            val latest = repository.getLatestSessionWithExpenses()
+            val recurringExpenses = latest?.expenses
+                ?.filter { it.isRecurring }
+                ?.map { e ->
+                    ExpenseUiModel(
+                        title      = e.title,
+                        amount     = e.amount.toBigDecimal().stripTrailingZeros().toPlainString(),
+                        category   = ExpenseCategory.fromName(e.category),
+                        isRecurring = true,
+                        isLocked   = true
+                    )
+                }
+                ?: emptyList()
+
+            if (recurringExpenses.isNotEmpty()) {
+                _uiState.value = BudgetUiState(
+                    showRecurringCarryDialog  = true,
+                    pendingRecurringExpenses  = recurringExpenses
+                )
+            } else {
+                _uiState.value = BudgetUiState()
+            }
+        }
+    }
+
+    /** Pre-fills the new budget with recurring expenses from the last session. */
+    fun acceptRecurringCarry() {
+        _uiState.update { state ->
+            val expenses = state.pendingRecurringExpenses
+            BudgetUiState(
+                expenses         = expenses + ExpenseUiModel(),
+                remainingBalance = -(expenses.sumOf { it.amountAsDouble })
+            )
+        }
+    }
+
+    /** Starts a clean new budget, ignoring recurring expenses. */
+    fun dismissRecurringCarry() { _uiState.value = BudgetUiState() }
 
     // ── Receipt handling ──────────────────────────────────────────────────────
 
@@ -333,6 +375,7 @@ class BudgetViewModel @Inject constructor(
                     }
 
                 repository.saveExpenses(expenseEntities)
+                repository.updateWidget()
 
                 _uiState.update {
                     it.copy(isSaving = false, savedSuccessfully = true, sessionId = newSessionId)

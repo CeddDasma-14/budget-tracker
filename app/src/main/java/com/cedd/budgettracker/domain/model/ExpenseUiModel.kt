@@ -1,7 +1,13 @@
 package com.cedd.budgettracker.domain.model
 
+import java.util.concurrent.atomic.AtomicLong
+
+private val _stableIdCounter = AtomicLong(0)
+
 data class ExpenseUiModel(
     val id: Long = 0L,
+    /** Stable per-instance key for LazyColumn — never changes even as list indices shift */
+    val stableId: Long = _stableIdCounter.incrementAndGet(),
     val title: String = "",
     val amount: String = "",
     val isPaid: Boolean = false,

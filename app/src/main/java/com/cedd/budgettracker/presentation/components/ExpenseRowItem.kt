@@ -7,7 +7,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -23,6 +22,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +43,7 @@ import coil.request.ImageRequest
 import com.cedd.budgettracker.domain.model.ExpenseCategory
 import com.cedd.budgettracker.domain.model.ExpenseUiModel
 import com.cedd.budgettracker.presentation.utils.CurrencyUtils
+import com.cedd.budgettracker.presentation.utils.ThousandSeparatorTransformation
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -135,67 +137,82 @@ private fun ExpenseCard(
     onCategoryChange: (ExpenseCategory) -> Unit,
     onToggleRecurring: () -> Unit
 ) {
-    val cardColor by animateColorAsState(
-        targetValue = when {
-            expense.isPaid && expense.isLocked -> Color(0xFFE3F2FD)
-            expense.isLocked -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            else -> MaterialTheme.colorScheme.surface
-        },
-        animationSpec = tween(350),
-        label = "card_bg"
-    )
-
-    val borderColor by animateColorAsState(
-        targetValue = if (expense.isLocked)
-            MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+    val catColor by animateColorAsState(
+        targetValue = if (expense.isPaid)
+            expense.category.color.copy(alpha = 0.3f)
         else
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+            expense.category.color.copy(alpha = 0.75f),
         animationSpec = tween(350),
-        label = "card_border"
+        label = "cat_strip_color"
     )
 
-    val elevation by animateDpAsState(
-        targetValue = if (expense.isLocked) 0.dp else 3.dp,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "card_elevation"
-    )
-
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, borderColor, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xCC1B3D5A),  // Dark teal-blue — prosperity, frosted glass
+                        Color(0xAA0C2236),  // Deep navy
+                    ),
+                    start = Offset(0f, 0f),
+                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                )
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0x7038BDF8),  // Electric blue top edge — glass highlight
+                        Color(0x2038BDF8),  // Faded at bottom
+                    )
+                ),
+                shape = RoundedCornerShape(14.dp)
+            )
             .animateContentSize(
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
                     stiffness = Spring.StiffnessMedium
                 )
-            ),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = cardColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = elevation)
+            )
     ) {
-        if (expense.isLocked) {
-            LockedRow(
-                expense = expense,
-                onPaidToggle = onPaidToggle,
-                onEdit = onToggleLock,
-                onDelete = onRemoveRow
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            // Colored left accent strip
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(
+                        catColor,
+                        RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp)
+                    )
             )
-        } else {
-            EditableRow(
-                expense = expense,
-                rowIndex = rowIndex,
-                onTitleChange = onTitleChange,
-                onAmountChange = onAmountChange,
-                onNotesChange = onNotesChange,
-                onPaidToggle = onPaidToggle,
-                onRemoveRow = onRemoveRow,
-                onLock = onToggleLock,
-                onAttachReceipt = onAttachReceipt,
-                onRemoveReceipt = onRemoveReceipt,
-                onCategoryChange = onCategoryChange,
-                onToggleRecurring = onToggleRecurring
-            )
+            Box(modifier = Modifier.weight(1f)) {
+                if (expense.isLocked) {
+                    LockedRow(
+                        expense = expense,
+                        onPaidToggle = onPaidToggle,
+                        onEdit = onToggleLock,
+                        onDelete = onRemoveRow
+                    )
+                } else {
+                    EditableRow(
+                        expense = expense,
+                        rowIndex = rowIndex,
+                        onTitleChange = onTitleChange,
+                        onAmountChange = onAmountChange,
+                        onNotesChange = onNotesChange,
+                        onPaidToggle = onPaidToggle,
+                        onRemoveRow = onRemoveRow,
+                        onLock = onToggleLock,
+                        onAttachReceipt = onAttachReceipt,
+                        onRemoveReceipt = onRemoveReceipt,
+                        onCategoryChange = onCategoryChange,
+                        onToggleRecurring = onToggleRecurring
+                    )
+                }
+            }
         }
     }
 }
@@ -277,11 +294,12 @@ private fun LockedRow(
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    letterSpacing = 0.2.sp,
                     textDecoration = if (expense.isPaid) TextDecoration.LineThrough else null,
                     color = if (expense.isPaid)
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        Color(0xFFBAE6FD).copy(alpha = 0.35f)
                     else
-                        MaterialTheme.colorScheme.onSurface
+                        Color(0xFFE2F4FF)  // Crisp blue-white — pairs with teal card
                 )
                 if (expense.isRecurring) {
                     Icon(
@@ -343,17 +361,18 @@ private fun LockedRow(
             color = if (expense.isPaid)
                 Color(0xFF00BFA5).copy(alpha = 0.12f)
             else
-                MaterialTheme.colorScheme.primaryContainer
+                Color(0xFF1E4060)  // Deep teal — harmonises with card background
         ) {
             Text(
                 text = CurrencyUtils.formatPhp(expense.amountAsDouble),
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold,
+                letterSpacing = 0.3.sp,
                 color = if (expense.isPaid)
                     Color(0xFF00BFA5).copy(alpha = 0.5f)
                 else
-                    MaterialTheme.colorScheme.onPrimaryContainer,
+                    Color(0xFFBAE6FD),  // Light sky-blue — readable on teal pill
                 textDecoration = if (expense.isPaid) TextDecoration.LineThrough else null
             )
         }
@@ -527,10 +546,11 @@ private fun EditableRow(
         ) {
             OutlinedTextField(
                 value = expense.amount,
-                onValueChange = onAmountChange,
+                onValueChange = { onAmountChange(CurrencyUtils.cleanAmountInput(it)) },
                 placeholder = { Text("0.00") },
                 singleLine = true,
                 prefix = { Text("₱", fontWeight = FontWeight.Bold) },
+                visualTransformation = ThousandSeparatorTransformation,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Decimal,
                     imeAction = ImeAction.Done

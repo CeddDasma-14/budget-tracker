@@ -36,6 +36,7 @@ import com.cedd.budgettracker.domain.model.ExpenseUiModel
 import com.cedd.budgettracker.presentation.components.BudgetProgressBar
 import com.cedd.budgettracker.presentation.components.ExpenseRowItem
 import com.cedd.budgettracker.presentation.utils.CurrencyUtils
+import com.cedd.budgettracker.presentation.utils.ThousandSeparatorTransformation
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -43,8 +44,6 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BudgetScreen(
-    onNavigateToHistory: () -> Unit,
-    onNavigateToSettings: () -> Unit,
     viewModel: BudgetViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -65,12 +64,12 @@ fun BudgetScreen(
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let { snackbarHostState.showSnackbar("Error: $it") }
     }
-    LaunchedEffect(state.recentlyDeletedExpense) {
+    LaunchedEffect(state.deletionEventId) {
         if (state.recentlyDeletedExpense != null) {
             val result = snackbarHostState.showSnackbar(
                 message = "Expense deleted",
                 actionLabel = "Undo",
-                duration = SnackbarDuration.Short
+                duration = SnackbarDuration.Long
             )
             if (result == SnackbarResult.ActionPerformed) {
                 viewModel.undoDelete()
@@ -81,33 +80,45 @@ fun BudgetScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("CeddFlow", fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        Text(
+                            "CeddFlow",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 20.sp,
+                            color = Color.White
+                        )
+                        Text(
+                            "Budget Tracker",
+                            fontSize = 11.sp,
+                            color = Color(0xFF38BDF8),
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 0.8.sp
+                        )
+                    }
+                },
                 actions = {
                     IconButton(onClick = viewModel::showTemplateDialog) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = "Load Template")
+                        Icon(Icons.Default.FolderOpen, contentDescription = "Load Template", tint = Color(0xFF94A3B8))
                     }
                     IconButton(onClick = viewModel::showSaveTemplateDialog) {
-                        Icon(Icons.Default.BookmarkAdd, contentDescription = "Save as Template")
+                        Icon(Icons.Default.BookmarkAdd, contentDescription = "Save as Template", tint = Color(0xFF94A3B8))
                     }
                     IconButton(onClick = {
                         globalPhotoPicker.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
                     }) {
-                        Icon(Icons.Default.AttachFile, contentDescription = "Add Receipt")
-                    }
-                    IconButton(onClick = onNavigateToHistory) {
-                        Icon(Icons.Default.History, contentDescription = "View History")
-                    }
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.AttachFile, contentDescription = "Add Receipt", tint = Color(0xFF94A3B8))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
+                    titleContentColor = Color.White
                 )
             )
         },
@@ -115,9 +126,9 @@ fun BudgetScreen(
             ExtendedFloatingActionButton(
                 onClick = { viewModel.addExpenseRow() },
                 icon = { Icon(Icons.Default.Add, "Add Expense") },
-                text = { Text("Add Expense") },
-                containerColor = MaterialTheme.colorScheme.secondary,
-                contentColor = MaterialTheme.colorScheme.onSecondary
+                text = { Text("Add Expense", fontWeight = FontWeight.SemiBold) },
+                containerColor = Color(0xFF0EA5E9),
+                contentColor = Color.White
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -139,6 +150,10 @@ fun BudgetScreen(
                     onDateChange = viewModel::updateSelectedDate,
                     onGoalAmountChange = viewModel::updateGoalAmount
                 )
+            }
+
+            item {
+                MetricsRow(state = state, modifier = Modifier.padding(horizontal = 16.dp))
             }
 
             // Overspend alert banner
@@ -198,7 +213,7 @@ fun BudgetScreen(
                     Text(
                         "${state.expenses.size} item(s)",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = Color(0xFFCBD5E1)
                     )
                     Box {
                         IconButton(onClick = { sortMenuExpanded = true }, modifier = Modifier.size(32.dp)) {
@@ -237,7 +252,7 @@ fun BudgetScreen(
 
             itemsIndexed(
                 items = state.expenses,
-                key = { index, expense -> if (expense.id != 0L) expense.id else "new_$index" }
+                key = { _, expense -> expense.stableId }
             ) { index, expense ->
                 ExpenseRowItem(
                     expense = expense,
@@ -339,6 +354,14 @@ fun BudgetScreen(
             )
         }
 
+        if (state.showRecurringCarryDialog) {
+            RecurringCarryDialog(
+                count     = state.pendingRecurringExpenses.size,
+                onAccept  = viewModel::acceptRecurringCarry,
+                onDismiss = viewModel::dismissRecurringCarry
+            )
+        }
+
         if (state.showTemplateDialog) {
             TemplateLoadDialog(
                 templates = templates,
@@ -375,14 +398,16 @@ private fun CategorySummaryCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = Color(0x801E3252)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x20FFFFFF))
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                "By Category",
+                "BY CATEGORY",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color(0xFF38BDF8),
+                letterSpacing = 1.sp
             )
             byCat.forEach { (cat, total) ->
                 Row(
@@ -398,17 +423,65 @@ private fun CategorySummaryCard(
                         Text(
                             cat.label,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = Color(0xFFCBD5E1)
                         )
                     }
                     Text(
                         CurrencyUtils.formatPhp(total),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = Color(0xFFCBD5E1)
                     )
                 }
             }
+        }
+    }
+}
+
+// ── Metrics row ────────────────────────────────────────────────────────────────
+
+@Composable
+private fun MetricsRow(state: BudgetUiState, modifier: Modifier = Modifier) {
+    val totalSpent  = state.expenses.sumOf { it.amountAsDouble }
+    val itemCount   = state.expenses.count { it.hasContent }
+    val paidCount   = state.expenses.count { it.isPaid && it.hasContent }
+    val goalValue   = state.goalAmount.replace(",", "").toDoubleOrNull() ?: 0.0
+    val goalMet     = goalValue > 0 && state.remainingBalance >= goalValue
+
+    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        MetricChip("Spent",  CurrencyUtils.formatPhp(totalSpent), Color(0xFFF87171), Modifier.weight(1f))
+        MetricChip("Items",  "$itemCount",                        Color(0xFF94A3B8), Modifier.weight(1f))
+        MetricChip("Paid",   "$paidCount",                        Color(0xFF34D399), Modifier.weight(1f))
+        if (goalValue > 0) {
+            MetricChip(
+                label  = "Goal",
+                value  = if (goalMet) "Met ✓" else CurrencyUtils.formatPhp(goalValue),
+                color  = if (goalMet) Color(0xFF34D399) else Color(0xFF38BDF8),
+                modifier = Modifier.weight(1f)
+            )
+        } else {
+            MetricChip("Saved", CurrencyUtils.formatPhp(state.remainingBalance.coerceAtLeast(0.0)), Color(0xFF38BDF8), Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun MetricChip(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0x801E3252)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x20FFFFFF))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
+            Spacer(Modifier.height(2.dp))
+            Text(label, fontSize = 9.sp, color = Color(0xFF94A3B8))
         }
     }
 }
@@ -455,9 +528,9 @@ private fun BudgetHeaderCard(
 
     val balanceColor by animateColorAsState(
         targetValue = when {
-            isOverBudget -> MaterialTheme.colorScheme.error
-            state.remainingBalance < budget * 0.1 -> Color(0xFFFF6F00)
-            else -> Color(0xFF00BFA5)
+            isOverBudget -> Color(0xFFF87171)              // Red glow
+            state.remainingBalance < budget * 0.1 -> Color(0xFFFBBF24)  // Amber
+            else -> Color(0xFF34D399)                      // Emerald — healthy
         },
         animationSpec = tween(300),
         label = "balance_color"
@@ -468,14 +541,59 @@ private fun BudgetHeaderCard(
             .fillMaxWidth()
             .padding(16.dp),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        colors = CardDefaults.cardColors(containerColor = Color(0x801E3252)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x20FFFFFF))
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // ── Hero balance ──────────────────────────────────────────────
+            val animatedBalance by animateFloatAsState(
+                targetValue = state.remainingBalance.toFloat(),
+                animationSpec = spring(stiffness = 200f),
+                label = "balance_anim"
+            )
+            Column {
+                Text(
+                    text = if (isOverBudget) "OVER BUDGET" else "REMAINING BALANCE",
+                    fontSize = 10.sp,
+                    color = Color(0xFF94A3B8),
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 1.sp
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = CurrencyUtils.formatPhp(animatedBalance.toDouble()),
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = balanceColor
+                )
+            }
 
+            // Spent / budget row
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    text = "${CurrencyUtils.formatPhp(totalExpenses)} spent",
+                    fontSize = 12.sp,
+                    color = Color(0xFF94A3B8)
+                )
+                if (budget > 0) {
+                    Text(
+                        text = "of ${CurrencyUtils.formatPhp(budget)}",
+                        fontSize = 12.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+                }
+            }
+
+            if (budget > 0) {
+                BudgetProgressBar(spent = totalExpenses, total = budget)
+            }
+
+            HorizontalDivider(color = Color(0xFF1B3A5C))
+
+            // ── Inputs ────────────────────────────────────────────────────
             OutlinedTextField(
                 value = state.sessionName,
                 onValueChange = onSessionNameChange,
@@ -529,11 +647,12 @@ private fun BudgetHeaderCard(
 
             OutlinedTextField(
                 value = state.initialBudget,
-                onValueChange = onInitialBudgetChange,
+                onValueChange = { onInitialBudgetChange(CurrencyUtils.cleanAmountInput(it)) },
                 label = { Text("Initial Budget") },
                 placeholder = { Text("0.00") },
                 singleLine = true,
                 prefix = { Text("₱", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+                visualTransformation = ThousandSeparatorTransformation,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Decimal,
                     imeAction = ImeAction.Next
@@ -562,11 +681,12 @@ private fun BudgetHeaderCard(
             // Savings goal field
             OutlinedTextField(
                 value = state.goalAmount,
-                onValueChange = onGoalAmountChange,
+                onValueChange = { onGoalAmountChange(CurrencyUtils.cleanAmountInput(it)) },
                 label = { Text("Savings Goal (optional)") },
                 placeholder = { Text("0.00") },
                 singleLine = true,
                 prefix = { Text("₱", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+                visualTransformation = ThousandSeparatorTransformation,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Decimal,
                     imeAction = ImeAction.Done
@@ -600,53 +720,6 @@ private fun BudgetHeaderCard(
                     goalStatus,
                     style = MaterialTheme.typography.labelSmall,
                     color = if (goalMet) Color(0xFF00BFA5) else Color.White.copy(alpha = 0.7f)
-                )
-            }
-
-            // Budget progress bar
-            if (budget > 0) {
-                BudgetProgressBar(spent = totalExpenses, total = budget)
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-
-            val animatedBalance by animateFloatAsState(
-                targetValue = state.remainingBalance.toFloat(),
-                animationSpec = spring(stiffness = 200f),
-                label = "balance_anim"
-            )
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = if (isOverBudget) "OVER BUDGET" else "Remaining Balance",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = balanceColor,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = CurrencyUtils.formatPhp(animatedBalance.toDouble()),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = balanceColor,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.End
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Total Expenses",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                )
-                Text(
-                    text = CurrencyUtils.formatPhp(totalExpenses),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }
@@ -738,7 +811,7 @@ private fun TemplateLoadDialog(
                                     Text(
                                         "${template.expenses.size} expenses · ${CurrencyUtils.formatPhp(template.template.initialBudget)}",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = Color(0xFFCBD5E1)
                                     )
                                 }
                                 Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -750,6 +823,34 @@ private fun TemplateLoadDialog(
         },
         confirmButton = {},
         dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
+}
+
+// ── Recurring carry dialog ─────────────────────────────────────────────────────
+
+@Composable
+private fun RecurringCarryDialog(
+    count: Int,
+    onAccept: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+        title = { Text("Carry Over Recurring Expenses?") },
+        text = {
+            Text(
+                "Found $count recurring expense${if (count == 1) "" else "s"} from your last budget. " +
+                "Would you like to pre-fill the new budget with them?",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        },
+        confirmButton = {
+            Button(onClick = onAccept) { Text("Carry Over") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Start Fresh") }
+        }
     )
 }
 

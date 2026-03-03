@@ -13,6 +13,11 @@ interface BudgetSessionDao {
     @Query("SELECT * FROM budget_sessions ORDER BY createdAt DESC")
     fun getAllSessionsWithExpenses(): Flow<List<BudgetSessionWithExpenses>>
 
+    /** One-shot fetch of the most recently created session with its expenses. */
+    @Transaction
+    @Query("SELECT * FROM budget_sessions ORDER BY createdAt DESC LIMIT 1")
+    suspend fun getLatestSessionWithExpenses(): BudgetSessionWithExpenses?
+
     @Query("SELECT * FROM budget_sessions WHERE id = :sessionId")
     suspend fun getSessionById(sessionId: Long): BudgetSessionEntity?
 
